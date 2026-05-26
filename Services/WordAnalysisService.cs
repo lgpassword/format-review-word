@@ -6,6 +6,15 @@ namespace WordFormatAnalyzer.Services;
 
 public sealed class WordAnalysisService
 {
+    private readonly WordStyleResolver _styleResolver;
+    private readonly WordTerminologyService _terminology;
+
+    public WordAnalysisService(WordStyleResolver styleResolver, WordTerminologyService terminology)
+    {
+        _styleResolver = styleResolver;
+        _terminology = terminology;
+    }
+
     public DocumentAnalysisResult Analyze(string path, string fileName)
     {
         using var document = WordprocessingDocument.Open(path, false);
@@ -16,12 +25,14 @@ public sealed class WordAnalysisService
         {
             FileName = fileName,
             Comments = ExtractComments(mainPart),
-            Paragraphs = ExtractParagraphs(body),
+            Paragraphs = ExtractParagraphs(body, mainPart),
             Tables = ExtractTables(body),
             PageSetup = ExtractPageSetup(body)
         };
 
         result.BlankAreas = DetectBlankAreas(result.Paragraphs);
+        result.CoverageAreas = BuildCoverage(result);
+        result.UncheckedItems = BuildUncheckedItems(result);
         result.Baseline = BuildBaseline(result);
         return result;
     }
@@ -44,7 +55,7 @@ public sealed class WordAnalysisService
             .ToList();
     }
 
-    private static List<ParagraphSnapshot> ExtractParagraphs(Body body)
+    private List<ParagraphSnapshot> ExtractParagraphs(Body body, MainDocumentPart mainPart)
     {
         var paragraphs = body.Descendants<Paragraph>().ToList();
         var result = new List<ParagraphSnapshot>();
@@ -53,7 +64,12 @@ public sealed class WordAnalysisService
         {
             var paragraph = paragraphs[i];
             var properties = paragraph.ParagraphProperties;
-            var firstRunProperties = paragraph.Descendants<RunProperties>().FirstOrDefault();
+            var paragraphFormat = _styleResolver.ResolveParagraph(paragraph, mainPart);
+            var runs = ExtractRuns(paragraph, mainPart);
+            var dominantFontName = MostCommonWeighted(runs.Select(run => (run.FontName, run.CharacterCount)));
+            var dominantFontNameRaw = MostCommonWeighted(runs.Select(run => (run.FontNameRaw, run.CharacterCount)));
+            var dominantFontSize = MostCommonWeighted(runs.Select(run => (run.FontSize, run.CharacterCount)));
+            var dominantFontSizeRaw = MostCommonWeighted(runs.Select(run => (run.FontSizeRaw, run.CharacterCount)));
 
             result.Add(new ParagraphSnapshot
             {
@@ -61,17 +77,55 @@ public sealed class WordAnalysisService
                 Index = i + 1,
                 Text = paragraph.InnerText?.Trim() ?? "",
                 StyleId = properties?.ParagraphStyleId?.Val?.Value ?? "",
-                Justification = properties?.Justification?.Val?.Value.ToString() ?? "",
-                FontName = firstRunProperties?.RunFonts?.Ascii?.Value
-                    ?? firstRunProperties?.RunFonts?.HighAnsi?.Value
-                    ?? firstRunProperties?.RunFonts?.EastAsia?.Value
-                    ?? "",
-                FontSize = firstRunProperties?.FontSize?.Val?.Value ?? "",
-                Bold = firstRunProperties?.Bold is null ? null : firstRunProperties.Bold.Val?.Value ?? true,
-                SpacingBefore = properties?.SpacingBetweenLines?.Before?.Value ?? "",
-                SpacingAfter = properties?.SpacingBetweenLines?.After?.Value ?? "",
-                LineSpacing = properties?.SpacingBetweenLines?.Line?.Value ?? "",
-                FirstLineIndent = properties?.Indentation?.FirstLine?.Value ?? ""
+                JustificationRaw = paragraphFormat.JustificationRaw,
+                Justification = paragraphFormat.Justification,
+                FontNameRaw = dominantFontNameRaw,
+                FontName = dominantFontName,
+                FontSizeRaw = dominantFontSizeRaw,
+                FontSize = dominantFontSize,
+                Bold = runs.Select(run => run.Bold).FirstOrDefault(value => value is not null),
+                SpacingBeforeRaw = paragraphFormat.SpacingBeforeRaw,
+                SpacingBefore = paragraphFormat.SpacingBefore,
+                SpacingAfterRaw = paragraphFormat.SpacingAfterRaw,
+                SpacingAfter = paragraphFormat.SpacingAfter,
+                LineSpacingRaw = paragraphFormat.LineSpacingRaw,
+                LineSpacing = paragraphFormat.LineSpacing,
+                FirstLineIndentRaw = paragraphFormat.FirstLineIndentRaw,
+                FirstLineIndent = paragraphFormat.FirstLineIndent,
+                CharacterCount = paragraph.InnerText?.Length ?? 0,
+                RunCount = runs.Count,
+                Runs = runs
+            });
+        }
+
+        return result;
+    }
+
+    private List<RunFormatSnapshot> ExtractRuns(Paragraph paragraph, MainDocumentPart mainPart)
+    {
+        var runs = paragraph.Descendants<Run>().ToList();
+        var result = new List<RunFormatSnapshot>();
+
+        for (var i = 0; i < runs.Count; i++)
+        {
+            var run = runs[i];
+            var text = run.InnerText ?? "";
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            var format = _styleResolver.ResolveRun(run, paragraph, mainPart);
+            result.Add(new RunFormatSnapshot
+            {
+                Index = i + 1,
+                Text = text,
+                FontNameRaw = format.FontNameRaw,
+                FontName = format.FontName,
+                FontSizeRaw = format.FontSizeRaw,
+                FontSize = format.FontSize,
+                Bold = format.Bold,
+                CharacterCount = text.Length
             });
         }
 
@@ -100,7 +154,7 @@ public sealed class WordAnalysisService
         return result;
     }
 
-    private static PageSetupSnapshot ExtractPageSetup(Body body)
+    private PageSetupSnapshot ExtractPageSetup(Body body)
     {
         var section = body.Descendants<SectionProperties>().LastOrDefault();
         var margin = section?.GetFirstChild<PageMargin>();
@@ -124,7 +178,8 @@ public sealed class WordAnalysisService
             FooterMargin = ToCmText(TwipsToCm(margin?.Footer?.Value)),
             PageWidth = ToCmText(TwipsToCm(size?.Width?.Value)),
             PageHeight = ToCmText(TwipsToCm(size?.Height?.Value)),
-            Orientation = size?.Orient?.Value.ToString() ?? ""
+            OrientationRaw = size?.Orient?.Value.ToString() ?? "",
+            Orientation = _terminology.PageOrientation(size?.Orient?.Value.ToString() ?? "")
         };
     }
 
@@ -172,12 +227,19 @@ public sealed class WordAnalysisService
         return new TemplateBaseline
         {
             CommonFontName = MostCommon(nonEmpty.Select(p => p.FontName)),
+            CommonFontNameRaw = MostCommon(nonEmpty.Select(p => p.FontNameRaw)),
             CommonFontSize = MostCommon(nonEmpty.Select(p => p.FontSize)),
+            CommonFontSizeRaw = MostCommon(nonEmpty.Select(p => p.FontSizeRaw)),
             CommonJustification = MostCommon(nonEmpty.Select(p => p.Justification)),
+            CommonJustificationRaw = MostCommon(nonEmpty.Select(p => p.JustificationRaw)),
             CommonSpacingBefore = MostCommon(nonEmpty.Select(p => p.SpacingBefore)),
+            CommonSpacingBeforeRaw = MostCommon(nonEmpty.Select(p => p.SpacingBeforeRaw)),
             CommonSpacingAfter = MostCommon(nonEmpty.Select(p => p.SpacingAfter)),
+            CommonSpacingAfterRaw = MostCommon(nonEmpty.Select(p => p.SpacingAfterRaw)),
             CommonLineSpacing = MostCommon(nonEmpty.Select(p => p.LineSpacing)),
+            CommonLineSpacingRaw = MostCommon(nonEmpty.Select(p => p.LineSpacingRaw)),
             CommonFirstLineIndent = MostCommon(nonEmpty.Select(p => p.FirstLineIndent)),
+            CommonFirstLineIndentRaw = MostCommon(nonEmpty.Select(p => p.FirstLineIndentRaw)),
             CommonTableColumnCount = result.Tables.Select(t => t.MaxColumnCount)
                 .Where(value => value > 0)
                 .GroupBy(value => value)
@@ -188,12 +250,58 @@ public sealed class WordAnalysisService
         };
     }
 
+    private static List<CoverageAreaSummary> BuildCoverage(DocumentAnalysisResult result)
+    {
+        var bodyParagraphs = result.Paragraphs;
+        var objectCount = result.Tables.Count;
+        return
+        [
+            new CoverageAreaSummary
+            {
+                Area = "全文",
+                CharacterCount = bodyParagraphs.Sum(paragraph => paragraph.CharacterCount),
+                ParagraphCount = bodyParagraphs.Count,
+                ObjectCount = objectCount,
+                CheckedCharacterCount = bodyParagraphs.Sum(paragraph => paragraph.CharacterCount),
+                CheckedParagraphCount = bodyParagraphs.Count,
+                CheckedObjectCount = objectCount,
+                Notes = objectCount == 0 ? [] : ["表格结构已检查，表格内文字按段落文本参与字体字号检查。"]
+            }
+        ];
+    }
+
+    private static List<UncheckedItem> BuildUncheckedItems(DocumentAnalysisResult result)
+    {
+        var uncheckedItems = new List<UncheckedItem>
+        {
+            new()
+            {
+                Area = "页码和目录",
+                Location = "目录区域附近",
+                TargetElementId = "p:0",
+                Reason = "真实页码和目录页码需要 Word 排版结果；当前阶段只做结构检查，不强行判断页码是否一致。"
+            }
+        };
+
+        return uncheckedItems;
+    }
+
     private static string MostCommon(IEnumerable<string> values)
     {
         return values
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .GroupBy(value => value)
             .OrderByDescending(group => group.Count())
+            .Select(group => group.Key)
+            .FirstOrDefault() ?? "";
+    }
+
+    private static string MostCommonWeighted(IEnumerable<(string Value, int Weight)> values)
+    {
+        return values
+            .Where(item => !string.IsNullOrWhiteSpace(item.Value))
+            .GroupBy(item => item.Value)
+            .OrderByDescending(group => group.Sum(item => Math.Max(1, item.Weight)))
             .Select(group => group.Key)
             .FirstOrDefault() ?? "";
     }

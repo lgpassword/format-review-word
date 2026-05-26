@@ -20,9 +20,11 @@ public sealed class WordComparisonService
 
         AddPageSetupIssues(issues, baseline.PageSetup, target.PageSetup);
         AddParagraphIssues(issues, baseline, target.Paragraphs);
+        AddRunIssues(issues, baseline, target.Paragraphs);
         AddTableIssues(issues, baseline, target.Tables);
         AddBlankAreaIssues(issues, target.BlankAreas);
         AddPunctuationIssues(issues, template, target);
+        AddUncheckedIssues(issues, target.UncheckedItems);
 
         return new AnalysisReport
         {
@@ -31,7 +33,9 @@ public sealed class WordComparisonService
             TemplateFileName = template.FileName,
             TargetFileName = target.FileName,
             Conclusion = issues.Any(issue => issue.Severity is "严重" or "错误") ? "未达到合格标准" : "未发现明显格式问题",
-            Issues = issues
+            Issues = issues,
+            CoverageAreas = target.CoverageAreas,
+            UncheckedItems = target.UncheckedItems
         };
     }
 
@@ -56,6 +60,65 @@ public sealed class WordComparisonService
 
             AddIfDifferent(issues, "S", "错误", "段落", paragraph, "行距不符合模板",
                 baseline.CommonLineSpacing, paragraph.LineSpacing, "打开段落设置，调整行距。");
+        }
+    }
+
+    private void AddRunIssues(List<FormatIssue> issues, TemplateBaseline baseline, IEnumerable<ParagraphSnapshot> paragraphs)
+    {
+        if (string.IsNullOrWhiteSpace(baseline.CommonFontName) && string.IsNullOrWhiteSpace(baseline.CommonFontSize))
+        {
+            return;
+        }
+
+        foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
+        {
+            var mismatchedFonts = paragraph.Runs
+                .Where(run => !string.IsNullOrWhiteSpace(baseline.CommonFontName) && !string.IsNullOrWhiteSpace(run.FontName) && run.FontName != baseline.CommonFontName)
+                .Select(run => run.FontName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToList();
+
+            if (mismatchedFonts.Count > 0 && paragraph.FontName == baseline.CommonFontName)
+            {
+                issues.Add(new FormatIssue
+                {
+                    IssueCode = NextCode("F"),
+                    Severity = "错误",
+                    Category = "字体字号",
+                    Location = $"第 {paragraph.Index} 段",
+                    TargetElementId = paragraph.TargetElementId,
+                    Area = "正文",
+                    Title = "段内部分文字字体不符合模板",
+                    Expected = baseline.CommonFontName,
+                    Actual = string.Join("、", mismatchedFonts),
+                    Suggestion = $"选中第 {paragraph.Index} 段中字体不一致的文字，将字体改为 {baseline.CommonFontName}。"
+                });
+            }
+
+            var mismatchedSizes = paragraph.Runs
+                .Where(run => !string.IsNullOrWhiteSpace(baseline.CommonFontSize) && !string.IsNullOrWhiteSpace(run.FontSize) && run.FontSize != baseline.CommonFontSize)
+                .Select(run => run.FontSize)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToList();
+
+            if (mismatchedSizes.Count > 0 && paragraph.FontSize == baseline.CommonFontSize)
+            {
+                issues.Add(new FormatIssue
+                {
+                    IssueCode = NextCode("F"),
+                    Severity = "错误",
+                    Category = "字体字号",
+                    Location = $"第 {paragraph.Index} 段",
+                    TargetElementId = paragraph.TargetElementId,
+                    Area = "正文",
+                    Title = "段内部分文字字号不符合模板",
+                    Expected = baseline.CommonFontSize,
+                    Actual = string.Join("、", mismatchedSizes),
+                    Suggestion = $"选中第 {paragraph.Index} 段中字号不一致的文字，将字号改为 {baseline.CommonFontSize}。"
+                });
+            }
         }
     }
 
@@ -101,6 +164,28 @@ public sealed class WordComparisonService
                 Expected = "不应出现连续大量空段落",
                 Actual = finding.Description,
                 Suggestion = "删除多余空段落，或确认该空白是否为模板要求。"
+            });
+        }
+    }
+
+    private void AddUncheckedIssues(List<FormatIssue> issues, IEnumerable<UncheckedItem> uncheckedItems)
+    {
+        foreach (var item in uncheckedItems)
+        {
+            issues.Add(new FormatIssue
+            {
+                IssueCode = NextCode("I"),
+                Severity = "提醒",
+                Category = "未检查项",
+                Location = item.Location,
+                TargetElementId = item.TargetElementId,
+                Area = item.Area,
+                Title = $"{item.Area}暂未完整检查",
+                Expected = "需要 Word 排版结果或更明确的模板规则",
+                Actual = item.Reason,
+                Suggestion = "请在 Word 中人工确认该项，或后续提供明确模板规则后再检查。",
+                RequiresConfirmation = true,
+                IsUnchecked = true
             });
         }
     }
@@ -158,6 +243,7 @@ public sealed class WordComparisonService
             Category = "页面设置",
             Location = "全文页面设置",
             TargetElementId = "p:0",
+            Area = "页面设置",
             Title = $"{title}不符合模板",
             Expected = expectedText,
             Actual = string.IsNullOrWhiteSpace(actualText) ? "未设置" : actualText,
@@ -188,9 +274,10 @@ public sealed class WordComparisonService
             Category = category,
             Location = $"第 {paragraph.Index} 段",
             TargetElementId = paragraph.TargetElementId,
+            Area = "正文",
             Title = title,
             Expected = expected,
-            Actual = string.IsNullOrWhiteSpace(actual) ? "未设置" : actual,
+            Actual = string.IsNullOrWhiteSpace(actual) ? "未识别" : actual,
             Suggestion = suggestion
         });
     }

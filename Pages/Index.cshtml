@@ -90,6 +90,49 @@
             <div><dt>问题总数</dt><dd>@report.Issues.Count</dd></div>
         </dl>
 
+        @if (report.CoverageAreas.Count > 0)
+        {
+            <h3>检查覆盖率</h3>
+            <div class="table-responsive">
+                <table class="table table-sm issue-table">
+                    <thead>
+                    <tr>
+                        <th>区域</th>
+                        <th>覆盖率</th>
+                        <th>字符</th>
+                        <th>段落</th>
+                        <th>对象</th>
+                        <th>说明</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var area in report.CoverageAreas)
+                    {
+                        <tr class="@(area.CoveragePercent < 90 ? "table-warning" : "")">
+                            <td>@area.Area</td>
+                            <td>@area.CoveragePercent%</td>
+                            <td>@area.CheckedCharacterCount / @area.CharacterCount</td>
+                            <td>@area.CheckedParagraphCount / @area.ParagraphCount</td>
+                            <td>@area.CheckedObjectCount / @area.ObjectCount</td>
+                            <td>@string.Join("；", area.Notes)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (report.UncheckedItems.Count > 0)
+        {
+            <div class="alert alert-warning">
+                <strong>存在未完整检查项：</strong>
+                @foreach (var item in report.UncheckedItems)
+                {
+                    <div>@item.Area：@item.Reason</div>
+                }
+            </div>
+        }
+
         <div class="actions">
             <a class="btn btn-outline-primary" asp-page-handler="Download" asp-route-sessionId="@Model.Session!.Id" asp-route-kind="word">下载带批注 Word</a>
             <a class="btn btn-outline-success" asp-page-handler="Download" asp-route-sessionId="@Model.Session!.Id" asp-route-kind="normal">下载正常文档</a>

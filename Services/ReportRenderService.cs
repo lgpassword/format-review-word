@@ -35,6 +35,7 @@ public sealed class ReportRenderService
         builder.AppendLine($"<div class=\"box\"><strong>检测结论</strong><br>{Encode(report.Conclusion)}</div>");
         builder.AppendLine($"<div class=\"box\"><strong>问题总数</strong><br>{report.Issues.Count}</div>");
         builder.AppendLine("</div>");
+        WriteCoverage(report, builder);
         builder.AppendLine("<h2>问题列表</h2>");
         builder.AppendLine("<table><thead><tr><th>编号</th><th>级别</th><th>类型</th><th>位置</th><th>问题</th><th>模板要求</th><th>实际情况</th><th>修改建议</th></tr></thead><tbody>");
 
@@ -55,6 +56,44 @@ public sealed class ReportRenderService
         builder.AppendLine("</tbody></table>");
         builder.AppendLine("</body></html>");
         return builder.ToString();
+    }
+
+    private static void WriteCoverage(AnalysisReport report, StringBuilder builder)
+    {
+        if (report.CoverageAreas.Count > 0)
+        {
+            builder.AppendLine("<h2>检查覆盖率</h2>");
+            builder.AppendLine("<table><thead><tr><th>区域</th><th>覆盖率</th><th>字符</th><th>段落</th><th>对象</th><th>说明</th></tr></thead><tbody>");
+            foreach (var area in report.CoverageAreas)
+            {
+                builder.AppendLine("<tr>");
+                builder.AppendLine($"<td>{Encode(area.Area)}</td>");
+                builder.AppendLine($"<td>{area.CoveragePercent}%</td>");
+                builder.AppendLine($"<td>{area.CheckedCharacterCount} / {area.CharacterCount}</td>");
+                builder.AppendLine($"<td>{area.CheckedParagraphCount} / {area.ParagraphCount}</td>");
+                builder.AppendLine($"<td>{area.CheckedObjectCount} / {area.ObjectCount}</td>");
+                builder.AppendLine($"<td>{Encode(string.Join("；", area.Notes))}</td>");
+                builder.AppendLine("</tr>");
+            }
+
+            builder.AppendLine("</tbody></table>");
+        }
+
+        if (report.UncheckedItems.Count > 0)
+        {
+            builder.AppendLine("<h2>未完整检查项</h2>");
+            builder.AppendLine("<table><thead><tr><th>区域</th><th>位置</th><th>原因</th></tr></thead><tbody>");
+            foreach (var item in report.UncheckedItems)
+            {
+                builder.AppendLine("<tr>");
+                builder.AppendLine($"<td>{Encode(item.Area)}</td>");
+                builder.AppendLine($"<td>{Encode(item.Location)}</td>");
+                builder.AppendLine($"<td>{Encode(item.Reason)}</td>");
+                builder.AppendLine("</tr>");
+            }
+
+            builder.AppendLine("</tbody></table>");
+        }
     }
 
     private static string Encode(string value)

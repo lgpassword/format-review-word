@@ -17,6 +17,8 @@ builder.Services.AddSingleton<WordConversionService>();
 builder.Services.AddSingleton<IssueTextService>();
 builder.Services.AddSingleton<PunctuationIssueService>();
 builder.Services.AddSingleton<NormalDocumentService>();
+builder.Services.AddSingleton<WordTerminologyService>();
+builder.Services.AddSingleton<WordStyleResolver>();
 
 var app = builder.Build();
 

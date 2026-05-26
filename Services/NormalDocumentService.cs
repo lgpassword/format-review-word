@@ -37,7 +37,7 @@ public sealed class NormalDocumentService
         if (baseline.PageWidthCmValue is not null) size.Width = CmToTwipsUInt(baseline.PageWidthCmValue.Value);
         if (baseline.PageHeightCmValue is not null) size.Height = CmToTwipsUInt(baseline.PageHeightCmValue.Value);
 
-        var orientation = ParsePageOrientation(baseline.Orientation);
+        var orientation = ParsePageOrientation(string.IsNullOrWhiteSpace(baseline.OrientationRaw) ? baseline.Orientation : baseline.OrientationRaw);
         if (orientation is not null)
         {
             size.Orient = orientation.Value;
@@ -49,32 +49,32 @@ public sealed class NormalDocumentService
         foreach (var paragraph in paragraphs)
         {
             var pPr = paragraph.ParagraphProperties ?? paragraph.PrependChild(new ParagraphProperties());
-            var justification = ParseJustification(baseline.CommonJustification);
+            var justification = ParseJustification(string.IsNullOrWhiteSpace(baseline.CommonJustificationRaw) ? baseline.CommonJustification : baseline.CommonJustificationRaw);
             if (justification is not null)
             {
                 pPr.Justification = new Justification { Val = justification.Value };
             }
 
             pPr.SpacingBetweenLines ??= new SpacingBetweenLines();
-            if (!string.IsNullOrWhiteSpace(baseline.CommonSpacingBefore))
+            if (!string.IsNullOrWhiteSpace(baseline.CommonSpacingBeforeRaw))
             {
-                pPr.SpacingBetweenLines.Before = baseline.CommonSpacingBefore;
+                pPr.SpacingBetweenLines.Before = baseline.CommonSpacingBeforeRaw;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonSpacingAfter))
+            if (!string.IsNullOrWhiteSpace(baseline.CommonSpacingAfterRaw))
             {
-                pPr.SpacingBetweenLines.After = baseline.CommonSpacingAfter;
+                pPr.SpacingBetweenLines.After = baseline.CommonSpacingAfterRaw;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonLineSpacing))
+            if (!string.IsNullOrWhiteSpace(baseline.CommonLineSpacingRaw))
             {
-                pPr.SpacingBetweenLines.Line = baseline.CommonLineSpacing;
+                pPr.SpacingBetweenLines.Line = baseline.CommonLineSpacingRaw;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonFirstLineIndent))
+            if (!string.IsNullOrWhiteSpace(baseline.CommonFirstLineIndentRaw))
             {
                 pPr.Indentation ??= new Indentation();
-                pPr.Indentation.FirstLine = baseline.CommonFirstLineIndent;
+                pPr.Indentation.FirstLine = baseline.CommonFirstLineIndentRaw;
             }
 
             ApplyRunDefaults(paragraph, baseline);
@@ -86,18 +86,18 @@ public sealed class NormalDocumentService
         foreach (var run in paragraph.Descendants<Run>())
         {
             var runProperties = run.RunProperties ?? run.PrependChild(new RunProperties());
-            if (!string.IsNullOrWhiteSpace(baseline.CommonFontName))
+            if (!string.IsNullOrWhiteSpace(baseline.CommonFontNameRaw))
             {
                 runProperties.RunFonts ??= new RunFonts();
-                runProperties.RunFonts.Ascii = baseline.CommonFontName;
-                runProperties.RunFonts.HighAnsi = baseline.CommonFontName;
-                runProperties.RunFonts.EastAsia = baseline.CommonFontName;
+                runProperties.RunFonts.Ascii = baseline.CommonFontNameRaw;
+                runProperties.RunFonts.HighAnsi = baseline.CommonFontNameRaw;
+                runProperties.RunFonts.EastAsia = baseline.CommonFontNameRaw;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonFontSize))
+            if (!string.IsNullOrWhiteSpace(baseline.CommonFontSizeRaw))
             {
-                runProperties.FontSize = new FontSize { Val = baseline.CommonFontSize };
-                runProperties.FontSizeComplexScript = new FontSizeComplexScript { Val = baseline.CommonFontSize };
+                runProperties.FontSize = new FontSize { Val = baseline.CommonFontSizeRaw };
+                runProperties.FontSizeComplexScript = new FontSizeComplexScript { Val = baseline.CommonFontSizeRaw };
             }
         }
     }
