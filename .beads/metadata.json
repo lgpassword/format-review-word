@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "WordFormatAnalyzer",
+  "project_id": "938ab32e-64aa-4d82-933b-1b557aba2b26"
+}
