@@ -3,3 +3,16 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# .NET
+bin/
+obj/
+
+# App runtime data
+App_Data/
+Generated/
+Uploads/
+
+# Local editor files
+.vs/
+*.user

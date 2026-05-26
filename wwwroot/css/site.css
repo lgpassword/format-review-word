@@ -1,0 +1,133 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+  background: #f7f8fa;
+  color: #1f2937;
+}
+
+.page-title {
+  margin: 24px 0;
+}
+
+.page-title h1 {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.page-title p,
+.step-heading p {
+  color: #6b7280;
+  margin: 0;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.step-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.step-heading h2,
+.panel h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.step-number {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #0d6efd;
+  color: #fff;
+  font-weight: 700;
+}
+
+.upload-form,
+.filter-form,
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.upload-form .form-control {
+  max-width: 520px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summary-grid div {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.summary-grid dt {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.summary-grid dd {
+  margin: 3px 0 0;
+  font-weight: 600;
+}
+
+.comment-list {
+  margin-top: 10px;
+}
+
+.filter-form {
+  margin: 16px 0;
+}
+
+.filter-form .form-select {
+  width: 160px;
+}
+
+.issue-table {
+  background: #fff;
+}
+
+.issue-table th {
+  white-space: nowrap;
+}
+
+.severity {
+  color: #b91c1c;
+  font-weight: 700;
+}

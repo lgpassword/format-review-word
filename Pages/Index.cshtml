@@ -1,0 +1,163 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Word 格式检查";
+    var report = Model.Session?.Report;
+    var severities = report?.Issues.Select(i => i.Severity).Distinct().ToList() ?? [];
+    var categories = report?.Issues.Select(i => i.Category).Distinct().ToList() ?? [];
+}
+
+<section class="page-title">
+    <h1>Word 格式检查</h1>
+    <p>先上传模板并完成分析，再上传实际文档进行检查。</p>
+</section>
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@error.ErrorMessage</div>
+        }
+    </div>
+}
+
+<section class="panel">
+    <div class="step-heading">
+        <span class="step-number">1</span>
+        <div>
+            <h2>上传模板文档</h2>
+            <p>模板必须是 .docx，程序会先读取批注和常见格式。</p>
+        </div>
+    </div>
+    <form method="post" enctype="multipart/form-data" asp-page-handler="Template" class="upload-form">
+        <input class="form-control" type="file" asp-for="TemplateFile" accept=".docx" />
+        <button class="btn btn-primary" type="submit">分析模板</button>
+    </form>
+</section>
+
+@if (Model.Session is not null)
+{
+    <section class="panel">
+        <h2>模板分析摘要</h2>
+        <dl class="summary-grid">
+            <div><dt>模板文件</dt><dd>@Model.Session.TemplateFileName</dd></div>
+            <div><dt>批注数量</dt><dd>@Model.Session.TemplateAnalysis.Comments.Count</dd></div>
+            <div><dt>段落数量</dt><dd>@Model.Session.TemplateAnalysis.Paragraphs.Count</dd></div>
+            <div><dt>表格数量</dt><dd>@Model.Session.TemplateAnalysis.Tables.Count</dd></div>
+            <div><dt>常见字体</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonFontName.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonFontName)</dd></div>
+            <div><dt>常见字号</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonFontSize.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonFontSize)</dd></div>
+        </dl>
+
+        @if (Model.Session.TemplateAnalysis.Comments.Count > 0)
+        {
+            <details>
+                <summary>查看模板批注</summary>
+                <ul class="comment-list">
+                    @foreach (var comment in Model.Session.TemplateAnalysis.Comments.Take(20))
+                    {
+                        <li><strong>@comment.Author</strong>：@comment.Text</li>
+                    }
+                </ul>
+            </details>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="step-heading">
+            <span class="step-number">2</span>
+            <div>
+                <h2>上传实际文档</h2>
+                <p>只有模板分析完成后，才进行实际文档检查。</p>
+            </div>
+        </div>
+        <form method="post" enctype="multipart/form-data" asp-page-handler="Target" class="upload-form">
+            <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
+            <input class="form-control" type="file" asp-for="TargetFile" accept=".docx" />
+            <button class="btn btn-success" type="submit">开始检测</button>
+        </form>
+    </section>
+}
+
+@if (report is not null)
+{
+    <section class="panel">
+        <h2>检测报告</h2>
+        <dl class="summary-grid">
+            <div><dt>报告编号</dt><dd>@report.ReportId</dd></div>
+            <div><dt>实际文档</dt><dd>@report.TargetFileName</dd></div>
+            <div><dt>检测结论</dt><dd>@report.Conclusion</dd></div>
+            <div><dt>问题总数</dt><dd>@report.Issues.Count</dd></div>
+        </dl>
+
+        <div class="actions">
+            <a class="btn btn-outline-primary" asp-page-handler="Download" asp-route-sessionId="@Model.Session!.Id" asp-route-kind="word">下载带批注 Word</a>
+            <a class="btn btn-outline-secondary" asp-page-handler="Download" asp-route-sessionId="@Model.Session!.Id" asp-route-kind="html">导出 HTML 报告</a>
+        </div>
+
+        <form method="get" class="filter-form">
+            <input type="hidden" name="sessionId" value="@Model.Session!.Id" />
+            <select class="form-select" name="severity">
+                <option value="">全部级别</option>
+                @foreach (var severity in severities)
+                {
+                    if (Model.Severity == severity)
+                    {
+                        <option value="@severity" selected>@severity</option>
+                    }
+                    else
+                    {
+                        <option value="@severity">@severity</option>
+                    }
+                }
+            </select>
+            <select class="form-select" name="category">
+                <option value="">全部类型</option>
+                @foreach (var category in categories)
+                {
+                    if (Model.Category == category)
+                    {
+                        <option value="@category" selected>@category</option>
+                    }
+                    else
+                    {
+                        <option value="@category">@category</option>
+                    }
+                }
+            </select>
+            <button class="btn btn-light" type="submit">筛选</button>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-sm issue-table">
+                <thead>
+                <tr>
+                    <th>编号</th>
+                    <th>级别</th>
+                    <th>类型</th>
+                    <th>位置</th>
+                    <th>问题</th>
+                    <th>模板要求</th>
+                    <th>实际情况</th>
+                    <th>修改建议</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var issue in Model.VisibleIssues)
+                {
+                    <tr>
+                        <td>@issue.IssueCode</td>
+                        <td><span class="severity">@issue.Severity</span></td>
+                        <td>@issue.Category</td>
+                        <td>@issue.Location</td>
+                        <td>@issue.Title</td>
+                        <td>@issue.Expected</td>
+                        <td>@issue.Actual</td>
+                        <td>@issue.Suggestion</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
