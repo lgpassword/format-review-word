@@ -7,6 +7,13 @@ namespace WordFormatAnalyzer.Services;
 
 public sealed class WordAnnotationService
 {
+    private readonly IssueTextService _issueText;
+
+    public WordAnnotationService(IssueTextService issueText)
+    {
+        _issueText = issueText;
+    }
+
     public string CreateAnnotatedCopy(string targetPath, string outputPath, IReadOnlyList<FormatIssue> issues)
     {
         File.Copy(targetPath, outputPath, overwrite: true);
@@ -62,7 +69,11 @@ public sealed class WordAnnotationService
             Date = DateTime.UtcNow
         };
 
-        comment.AppendChild(new Paragraph(new Run(new Text(text))));
+        foreach (var line in text.Split(Environment.NewLine, StringSplitOptions.None))
+        {
+            comment.AppendChild(new Paragraph(new Run(new Text(line))));
+        }
+
         comments.AppendChild(comment);
 
         paragraph.InsertAt(new CommentRangeStart { Id = id }, 0);
@@ -70,14 +81,8 @@ public sealed class WordAnnotationService
         paragraph.AppendChild(new Run(new CommentReference { Id = id }));
     }
 
-    private static string BuildCommentText(FormatIssue issue)
+    private string BuildCommentText(FormatIssue issue)
     {
-        return $"""
-            【{issue.IssueCode} {issue.Severity}】{issue.Title}
-            位置：{issue.Location}
-            模板要求：{issue.Expected}
-            实际情况：{issue.Actual}
-            修改建议：{issue.Suggestion}
-            """;
+        return _issueText.BuildComment(issue);
     }
 }

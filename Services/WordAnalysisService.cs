@@ -108,14 +108,22 @@ public sealed class WordAnalysisService
 
         return new PageSetupSnapshot
         {
-            TopMargin = margin?.Top?.Value.ToString() ?? "",
-            BottomMargin = margin?.Bottom?.Value.ToString() ?? "",
-            LeftMargin = margin?.Left?.Value.ToString() ?? "",
-            RightMargin = margin?.Right?.Value.ToString() ?? "",
-            HeaderMargin = margin?.Header?.Value.ToString() ?? "",
-            FooterMargin = margin?.Footer?.Value.ToString() ?? "",
-            PageWidth = size?.Width?.Value.ToString() ?? "",
-            PageHeight = size?.Height?.Value.ToString() ?? "",
+            TopMarginCmValue = TwipsToCm(margin?.Top?.Value),
+            BottomMarginCmValue = TwipsToCm(margin?.Bottom?.Value),
+            LeftMarginCmValue = TwipsToCm(margin?.Left?.Value),
+            RightMarginCmValue = TwipsToCm(margin?.Right?.Value),
+            HeaderMarginCmValue = TwipsToCm(margin?.Header?.Value),
+            FooterMarginCmValue = TwipsToCm(margin?.Footer?.Value),
+            PageWidthCmValue = TwipsToCm(size?.Width?.Value),
+            PageHeightCmValue = TwipsToCm(size?.Height?.Value),
+            TopMargin = ToCmText(TwipsToCm(margin?.Top?.Value)),
+            BottomMargin = ToCmText(TwipsToCm(margin?.Bottom?.Value)),
+            LeftMargin = ToCmText(TwipsToCm(margin?.Left?.Value)),
+            RightMargin = ToCmText(TwipsToCm(margin?.Right?.Value)),
+            HeaderMargin = ToCmText(TwipsToCm(margin?.Header?.Value)),
+            FooterMargin = ToCmText(TwipsToCm(margin?.Footer?.Value)),
+            PageWidth = ToCmText(TwipsToCm(size?.Width?.Value)),
+            PageHeight = ToCmText(TwipsToCm(size?.Height?.Value)),
             Orientation = size?.Orient?.Value.ToString() ?? ""
         };
     }
@@ -193,5 +201,20 @@ public sealed class WordAnalysisService
     private static string Limit(string value, int maxLength)
     {
         return value.Length <= maxLength ? value : value[..maxLength] + "...";
+    }
+
+    private static double? TwipsToCm(long? twips)
+    {
+        if (twips is null)
+        {
+            return null;
+        }
+
+        return Math.Round(twips.Value / 567.0, 2);
+    }
+
+    private static string ToCmText(double? value)
+    {
+        return value is null ? "" : $"{value:0.##} 厘米";
     }
 }

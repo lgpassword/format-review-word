@@ -5,6 +5,12 @@ namespace WordFormatAnalyzer.Services;
 public sealed class WordComparisonService
 {
     private readonly Dictionary<string, int> _counters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly PunctuationIssueService _punctuation;
+
+    public WordComparisonService(PunctuationIssueService punctuation)
+    {
+        _punctuation = punctuation;
+    }
 
     public AnalysisReport Compare(DocumentAnalysisResult template, DocumentAnalysisResult target)
     {
@@ -16,6 +22,7 @@ public sealed class WordComparisonService
         AddParagraphIssues(issues, baseline, target.Paragraphs);
         AddTableIssues(issues, baseline, target.Tables);
         AddBlankAreaIssues(issues, target.BlankAreas);
+        AddPunctuationIssues(issues, template, target);
 
         return new AnalysisReport
         {
@@ -98,22 +105,48 @@ public sealed class WordComparisonService
         }
     }
 
-    private void AddPageSetupIssues(List<FormatIssue> issues, PageSetupSnapshot expected, PageSetupSnapshot actual)
+    private void AddPunctuationIssues(List<FormatIssue> issues, DocumentAnalysisResult template, DocumentAnalysisResult target)
     {
-        AddPageIssue(issues, "上边距", expected.TopMargin, actual.TopMargin);
-        AddPageIssue(issues, "下边距", expected.BottomMargin, actual.BottomMargin);
-        AddPageIssue(issues, "左边距", expected.LeftMargin, actual.LeftMargin);
-        AddPageIssue(issues, "右边距", expected.RightMargin, actual.RightMargin);
-        AddPageIssue(issues, "页眉边距", expected.HeaderMargin, actual.HeaderMargin);
-        AddPageIssue(issues, "页脚边距", expected.FooterMargin, actual.FooterMargin);
-        AddPageIssue(issues, "纸张宽度", expected.PageWidth, actual.PageWidth);
-        AddPageIssue(issues, "纸张高度", expected.PageHeight, actual.PageHeight);
-        AddPageIssue(issues, "纸张方向", expected.Orientation, actual.Orientation);
+        foreach (var paragraph in target.Paragraphs.Where(p => !p.IsEmpty))
+        {
+            foreach (var issue in _punctuation.Detect(paragraph))
+            {
+                issue.IssueCode = NextCode("I");
+                issues.Add(issue);
+            }
+        }
     }
 
-    private void AddPageIssue(List<FormatIssue> issues, string title, string expected, string actual)
+    private void AddPageSetupIssues(List<FormatIssue> issues, PageSetupSnapshot expected, PageSetupSnapshot actual)
     {
-        if (string.IsNullOrWhiteSpace(expected) || expected == actual)
+        AddPageIssue(issues, "上边距", expected.TopMarginCmValue, actual.TopMarginCmValue, expected.TopMargin, actual.TopMargin);
+        AddPageIssue(issues, "下边距", expected.BottomMarginCmValue, actual.BottomMarginCmValue, expected.BottomMargin, actual.BottomMargin);
+        AddPageIssue(issues, "左边距", expected.LeftMarginCmValue, actual.LeftMarginCmValue, expected.LeftMargin, actual.LeftMargin);
+        AddPageIssue(issues, "右边距", expected.RightMarginCmValue, actual.RightMarginCmValue, expected.RightMargin, actual.RightMargin);
+        AddPageIssue(issues, "页眉边距", expected.HeaderMarginCmValue, actual.HeaderMarginCmValue, expected.HeaderMargin, actual.HeaderMargin);
+        AddPageIssue(issues, "页脚边距", expected.FooterMarginCmValue, actual.FooterMarginCmValue, expected.FooterMargin, actual.FooterMargin);
+        AddPageIssue(issues, "纸张宽度", expected.PageWidthCmValue, actual.PageWidthCmValue, expected.PageWidth, actual.PageWidth);
+        AddPageIssue(issues, "纸张高度", expected.PageHeightCmValue, actual.PageHeightCmValue, expected.PageHeight, actual.PageHeight);
+        if (!string.Equals(expected.Orientation, actual.Orientation, StringComparison.OrdinalIgnoreCase))
+        {
+            issues.Add(new FormatIssue
+            {
+                IssueCode = NextCode("P"),
+                Severity = "严重",
+                Category = "页面设置",
+                Location = "全文页面设置",
+                TargetElementId = "p:0",
+                Title = "纸张方向不符合模板",
+                Expected = expected.Orientation,
+                Actual = actual.Orientation,
+                Suggestion = "打开页面设置，将纸张方向改为模板要求。"
+            });
+        }
+    }
+
+    private void AddPageIssue(List<FormatIssue> issues, string title, double? expectedValue, double? actualValue, string expectedText, string actualText)
+    {
+        if (expectedValue is null || actualValue is null || Math.Abs(expectedValue.Value - actualValue.Value) < 0.01)
         {
             return;
         }
@@ -126,8 +159,8 @@ public sealed class WordComparisonService
             Location = "全文页面设置",
             TargetElementId = "p:0",
             Title = $"{title}不符合模板",
-            Expected = expected,
-            Actual = string.IsNullOrWhiteSpace(actual) ? "未设置" : actual,
+            Expected = expectedText,
+            Actual = string.IsNullOrWhiteSpace(actualText) ? "未设置" : actualText,
             Suggestion = $"打开页面设置，将{title}改为模板要求。"
         });
     }

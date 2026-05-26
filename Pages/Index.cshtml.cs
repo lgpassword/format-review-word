@@ -14,6 +14,9 @@ public class IndexModel : PageModel
     private readonly WordComparisonService _comparison;
     private readonly WordAnnotationService _annotation;
     private readonly ReportRenderService _reports;
+    private readonly WordConversionService _converter;
+    private readonly NormalDocumentService _normalDocument;
+    private readonly IssueTextService _issueText;
 
     public IndexModel(
         AppStorage storage,
@@ -21,7 +24,10 @@ public class IndexModel : PageModel
         WordAnalysisService analysis,
         WordComparisonService comparison,
         WordAnnotationService annotation,
-        ReportRenderService reports)
+        ReportRenderService reports,
+        WordConversionService converter,
+        NormalDocumentService normalDocument,
+        IssueTextService issueText)
     {
         _storage = storage;
         _sessions = sessions;
@@ -29,6 +35,9 @@ public class IndexModel : PageModel
         _comparison = comparison;
         _annotation = annotation;
         _reports = reports;
+        _converter = converter;
+        _normalDocument = normalDocument;
+        _issueText = issueText;
     }
 
     [BindProperty]
@@ -49,6 +58,14 @@ public class IndexModel : PageModel
     public AnalysisSession? Session { get; private set; }
     public IReadOnlyList<FormatIssue> VisibleIssues { get; private set; } = [];
 
+    private static bool IsWindows => OperatingSystem.IsWindows();
+
+    public string IssueTitle(FormatIssue issue) => _issueText.BuildReportTitle(issue);
+
+    public string IssueExpected(FormatIssue issue) => _issueText.BuildExpectedText(issue);
+
+    public string IssueActual(FormatIssue issue) => _issueText.BuildActualText(issue);
+
     public async Task OnGetAsync()
     {
         await LoadSessionAsync();
@@ -63,9 +80,16 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        if (Path.GetExtension(TemplateFile!.FileName).Equals(".doc", StringComparison.OrdinalIgnoreCase) && !IsWindows)
+        {
+            ModelState.AddModelError(string.Empty, "当前环境不支持 .doc 转换，请在 Windows 且安装 Microsoft Word 的环境中使用 .doc。");
+            return Page();
+        }
+
         var path = _storage.CreateUploadPath(TemplateFile!.FileName);
         await SaveUploadAsync(TemplateFile, path);
-        var analysis = _analysis.Analyze(path, TemplateFile.FileName);
+        var analysisPath = await _converter.EnsureDocxAsync(path, TemplateFile.FileName);
+        var analysis = _analysis.Analyze(analysisPath, TemplateFile.FileName);
 
         var session = new AnalysisSession
         {
@@ -103,18 +127,30 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        if (Path.GetExtension(TargetFile!.FileName).Equals(".doc", StringComparison.OrdinalIgnoreCase) && !IsWindows)
+        {
+            Session = session;
+            ModelState.AddModelError(string.Empty, "当前环境不支持 .doc 转换，请在 Windows 且安装 Microsoft Word 的环境中使用 .doc。");
+            return Page();
+        }
+
         var targetPath = _storage.CreateUploadPath(TargetFile!.FileName);
         await SaveUploadAsync(TargetFile, targetPath);
-        var targetAnalysis = _analysis.Analyze(targetPath, TargetFile.FileName);
+        var targetAnalysisPath = await _converter.EnsureDocxAsync(targetPath, TargetFile.FileName);
+        var targetAnalysis = _analysis.Analyze(targetAnalysisPath, TargetFile.FileName);
         var report = _comparison.Compare(session.TemplateAnalysis, targetAnalysis);
 
         var annotatedPath = _storage.CreateGeneratedPath($"{Path.GetFileNameWithoutExtension(TargetFile.FileName)}-格式检查批注.docx");
-        _annotation.CreateAnnotatedCopy(targetPath, annotatedPath, report.Issues);
+        _annotation.CreateAnnotatedCopy(targetAnalysisPath, annotatedPath, report.Issues);
         report.AnnotatedWordDownloadName = Path.GetFileName(annotatedPath);
 
         var htmlPath = _storage.CreateGeneratedPath($"{Path.GetFileNameWithoutExtension(TargetFile.FileName)}-格式检测报告.html");
         _reports.WriteHtmlReport(report, htmlPath);
         report.HtmlReportDownloadName = Path.GetFileName(htmlPath);
+
+        var normalPath = _storage.CreateGeneratedPath($"{Path.GetFileNameWithoutExtension(TargetFile.FileName)}-正常文档.docx");
+        _normalDocument.CreateNormalizedCopy(targetAnalysisPath, normalPath, session.TemplateAnalysis, report.Issues);
+        report.NormalDocumentDownloadName = Path.GetFileName(normalPath);
 
         session.TargetFileName = TargetFile.FileName;
         session.TargetPath = targetPath;
@@ -136,7 +172,11 @@ public class IndexModel : PageModel
 
         var path = kind.Equals("html", StringComparison.OrdinalIgnoreCase)
             ? session.HtmlReportPath
-            : session.AnnotatedPath;
+            : kind.Equals("normal", StringComparison.OrdinalIgnoreCase)
+                ? session.Report is null
+                    ? null
+                    : Path.Combine(_storage.GeneratedDirectory, session.Report.NormalDocumentDownloadName)
+                : session.AnnotatedPath;
 
         if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
         {
@@ -181,9 +221,10 @@ public class IndexModel : PageModel
             return "文件不能超过 20 MB。";
         }
 
-        return Path.GetExtension(file.FileName).Equals(".docx", StringComparison.OrdinalIgnoreCase)
+        var extension = Path.GetExtension(file.FileName);
+        return extension.Equals(".docx", StringComparison.OrdinalIgnoreCase) || extension.Equals(".doc", StringComparison.OrdinalIgnoreCase)
             ? null
-            : "目前只支持 .docx 文件。";
+            : "目前只支持 .doc 和 .docx 文件。";
     }
 
     private static async Task SaveUploadAsync(IFormFile file, string path)

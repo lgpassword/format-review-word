@@ -6,6 +6,13 @@ namespace WordFormatAnalyzer.Services;
 
 public sealed class ReportRenderService
 {
+    private readonly IssueTextService _issueText;
+
+    public ReportRenderService(IssueTextService issueText)
+    {
+        _issueText = issueText;
+    }
+
     public string WriteHtmlReport(AnalysisReport report, string outputPath)
     {
         var html = RenderHtml(report);
@@ -38,9 +45,9 @@ public sealed class ReportRenderService
             builder.AppendLine($"<td class=\"sev\">{Encode(issue.Severity)}</td>");
             builder.AppendLine($"<td>{Encode(issue.Category)}</td>");
             builder.AppendLine($"<td>{Encode(issue.Location)}</td>");
-            builder.AppendLine($"<td>{Encode(issue.Title)}</td>");
-            builder.AppendLine($"<td>{Encode(issue.Expected)}</td>");
-            builder.AppendLine($"<td>{Encode(issue.Actual)}</td>");
+            builder.AppendLine($"<td>{Encode(_issueText.BuildReportTitle(issue))}</td>");
+            builder.AppendLine($"<td>{Encode(RenderValue(issue, true))}</td>");
+            builder.AppendLine($"<td>{Encode(RenderValue(issue, false))}</td>");
             builder.AppendLine($"<td>{Encode(issue.Suggestion)}</td>");
             builder.AppendLine("</tr>");
         }
@@ -53,5 +60,30 @@ public sealed class ReportRenderService
     private static string Encode(string value)
     {
         return WebUtility.HtmlEncode(value);
+    }
+
+    private string RenderValue(FormatIssue issue, bool expected)
+    {
+        if (issue.Category == "页面设置")
+        {
+            return expected ? NormalizePageValue(issue.Expected) : NormalizePageValue(issue.Actual);
+        }
+
+        return expected ? _issueText.BuildExpectedText(issue) : _issueText.BuildActualText(issue);
+    }
+
+    private static string NormalizePageValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        if (value.Contains("厘米", StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+
+        return value;
     }
 }

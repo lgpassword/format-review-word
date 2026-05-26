@@ -52,6 +52,15 @@ public sealed class PageSetupSnapshot
     public string PageWidth { get; set; } = "";
     public string PageHeight { get; set; } = "";
     public string Orientation { get; set; } = "";
+
+    public double? TopMarginCmValue { get; set; }
+    public double? BottomMarginCmValue { get; set; }
+    public double? LeftMarginCmValue { get; set; }
+    public double? RightMarginCmValue { get; set; }
+    public double? HeaderMarginCmValue { get; set; }
+    public double? FooterMarginCmValue { get; set; }
+    public double? PageWidthCmValue { get; set; }
+    public double? PageHeightCmValue { get; set; }
 }
 
 public sealed class TemplateBaseline
@@ -90,6 +99,7 @@ public sealed class AnalysisReport
     public List<FormatIssue> Issues { get; set; } = [];
     public string AnnotatedWordDownloadName { get; set; } = "";
     public string HtmlReportDownloadName { get; set; } = "";
+    public string NormalDocumentDownloadName { get; set; } = "";
 }
 
 public sealed class AnalysisSession

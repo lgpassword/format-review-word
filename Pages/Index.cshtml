@@ -27,11 +27,11 @@
         <span class="step-number">1</span>
         <div>
             <h2>上传模板文档</h2>
-            <p>模板必须是 .docx，程序会先读取批注和常见格式。</p>
+            <p>模板支持 .doc 和 .docx，程序会先读取批注和常见格式。</p>
         </div>
     </div>
     <form method="post" enctype="multipart/form-data" asp-page-handler="Template" class="upload-form">
-        <input class="form-control" type="file" asp-for="TemplateFile" accept=".docx" />
+        <input class="form-control" type="file" asp-for="TemplateFile" accept=".doc,.docx" />
         <button class="btn btn-primary" type="submit">分析模板</button>
     </form>
 </section>
@@ -73,7 +73,7 @@
         </div>
         <form method="post" enctype="multipart/form-data" asp-page-handler="Target" class="upload-form">
             <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
-            <input class="form-control" type="file" asp-for="TargetFile" accept=".docx" />
+            <input class="form-control" type="file" asp-for="TargetFile" accept=".doc,.docx" />
             <button class="btn btn-success" type="submit">开始检测</button>
         </form>
     </section>
@@ -92,6 +92,7 @@
 
         <div class="actions">
             <a class="btn btn-outline-primary" asp-page-handler="Download" asp-route-sessionId="@Model.Session!.Id" asp-route-kind="word">下载带批注 Word</a>
+            <a class="btn btn-outline-success" asp-page-handler="Download" asp-route-sessionId="@Model.Session!.Id" asp-route-kind="normal">下载正常文档</a>
             <a class="btn btn-outline-secondary" asp-page-handler="Download" asp-route-sessionId="@Model.Session!.Id" asp-route-kind="html">导出 HTML 报告</a>
         </div>
 
@@ -150,9 +151,9 @@
                         <td><span class="severity">@issue.Severity</span></td>
                         <td>@issue.Category</td>
                         <td>@issue.Location</td>
-                        <td>@issue.Title</td>
-                        <td>@issue.Expected</td>
-                        <td>@issue.Actual</td>
+                        <td>@Model.IssueTitle(issue)</td>
+                        <td>@Model.IssueExpected(issue)</td>
+                        <td>@Model.IssueActual(issue)</td>
                         <td>@issue.Suggestion</td>
                     </tr>
                 }

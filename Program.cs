@@ -13,6 +13,10 @@ builder.Services.AddSingleton<WordAnalysisService>();
 builder.Services.AddSingleton<WordComparisonService>();
 builder.Services.AddSingleton<WordAnnotationService>();
 builder.Services.AddSingleton<ReportRenderService>();
+builder.Services.AddSingleton<WordConversionService>();
+builder.Services.AddSingleton<IssueTextService>();
+builder.Services.AddSingleton<PunctuationIssueService>();
+builder.Services.AddSingleton<NormalDocumentService>();
 
 var app = builder.Build();
 
