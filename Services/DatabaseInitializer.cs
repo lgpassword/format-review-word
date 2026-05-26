@@ -24,6 +24,8 @@ public sealed class DatabaseInitializer
                 TemplateFileName TEXT NOT NULL,
                 TemplatePath TEXT NOT NULL,
                 TemplateAnalysisJson TEXT NOT NULL,
+                ReferenceTemplatesJson TEXT NULL,
+                RuleConflictsJson TEXT NULL,
                 TargetFileName TEXT NULL,
                 TargetPath TEXT NULL,
                 ReportJson TEXT NULL,
@@ -33,5 +35,26 @@ public sealed class DatabaseInitializer
             """;
 
         await command.ExecuteNonQueryAsync();
+        await AddColumnIfMissingAsync(connection, "ReferenceTemplatesJson", "TEXT NULL");
+        await AddColumnIfMissingAsync(connection, "RuleConflictsJson", "TEXT NULL");
+    }
+
+    private static async Task AddColumnIfMissingAsync(SqliteConnection connection, string columnName, string definition)
+    {
+        var existsCommand = connection.CreateCommand();
+        existsCommand.CommandText = "PRAGMA table_info(AnalysisSessions);";
+
+        await using var reader = await existsCommand.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            if (reader.GetString(1).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        var addCommand = connection.CreateCommand();
+        addCommand.CommandText = $"ALTER TABLE AnalysisSessions ADD COLUMN {columnName} {definition};";
+        await addCommand.ExecuteNonQueryAsync();
     }
 }

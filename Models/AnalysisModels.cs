@@ -13,6 +13,37 @@ public sealed class DocumentAnalysisResult
     public TemplateBaseline Baseline { get; set; } = new();
 }
 
+public sealed class TemplateReferenceAnalysis
+{
+    public string FileName { get; set; } = "";
+    public string Path { get; set; } = "";
+    public DocumentAnalysisResult Analysis { get; set; } = new();
+}
+
+public sealed class TemplateRuleConflict
+{
+    public string ConflictId { get; set; } = "";
+    public string Category { get; set; } = "";
+    public string RuleName { get; set; } = "";
+    public string Location { get; set; } = "模板规则";
+    public string PrimaryValue { get; set; } = "";
+    public string PrimaryRawValue { get; set; } = "";
+    public string ReferenceValue { get; set; } = "";
+    public string ReferenceRawValue { get; set; } = "";
+    public List<TemplateRuleOption> ReferenceOptions { get; set; } = [];
+    public string SelectedValue { get; set; } = "";
+    public string RawSelectedValue { get; set; } = "";
+    public string Source { get; set; } = "总模板";
+    public bool IsResolved { get; set; }
+}
+
+public sealed class TemplateRuleOption
+{
+    public string Source { get; set; } = "";
+    public string DisplayValue { get; set; } = "";
+    public string RawValue { get; set; } = "";
+}
+
 public sealed record CommentInfo(string Author, DateTime? CreatedAt, string Text, string ContextText);
 
 public sealed class ParagraphSnapshot
@@ -181,6 +212,8 @@ public sealed class AnalysisSession
     public string TemplateFileName { get; set; } = "";
     public string TemplatePath { get; set; } = "";
     public DocumentAnalysisResult TemplateAnalysis { get; set; } = new();
+    public List<TemplateReferenceAnalysis> ReferenceTemplates { get; set; } = [];
+    public List<TemplateRuleConflict> RuleConflicts { get; set; } = [];
     public string? TargetFileName { get; set; }
     public string? TargetPath { get; set; }
     public AnalysisReport? Report { get; set; }

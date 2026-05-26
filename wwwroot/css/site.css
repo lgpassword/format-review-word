@@ -119,6 +119,15 @@ body {
   width: 160px;
 }
 
+.conflict-custom {
+  min-width: 180px;
+}
+
+.conflict-options {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .issue-table {
   background: #fff;
 }

@@ -49,6 +49,110 @@
             <div><dt>常见字号</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonFontSize.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonFontSize)</dd></div>
         </dl>
 
+        <form method="post" enctype="multipart/form-data" asp-page-handler="ReferenceTemplate" class="upload-form">
+            <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
+            <input class="form-control" type="file" asp-for="ReferenceTemplateFile" accept=".doc,.docx" />
+            <button class="btn btn-outline-primary" type="submit">上传合格参考模板</button>
+        </form>
+
+        @if (Model.Session.ReferenceTemplates.Count > 0)
+        {
+            <details open>
+                <summary>已上传合格参考模板：@Model.Session.ReferenceTemplates.Count 个</summary>
+                <ul class="comment-list">
+                    @foreach (var reference in Model.Session.ReferenceTemplates)
+                    {
+                        <li>@reference.FileName</li>
+                    }
+                </ul>
+            </details>
+        }
+
+        @if (Model.Session.RuleConflicts.Count > 0)
+        {
+            <section class="panel">
+                <h3>模板规则冲突</h3>
+                <p>总模板和合格参考模板存在差异，请选择本次检查采用的规则。</p>
+                <form method="post" asp-page-handler="ResolveConflicts">
+                    <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
+                    <div class="table-responsive">
+                        <table class="table table-sm issue-table">
+                            <thead>
+                            <tr>
+                                <th>规则</th>
+                                <th>总模板</th>
+                                <th>合格参考模板差异</th>
+                                <th>本次采用</th>
+                                <th>自定义规则</th>
+                                <th>状态</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var conflict in Model.Session.RuleConflicts)
+                            {
+                                <tr>
+                                    <td>@conflict.Category / @conflict.RuleName</td>
+                                    <td>@conflict.PrimaryValue</td>
+                                    <td>
+                                        @if (conflict.ReferenceOptions.Count > 0)
+                                        {
+                                            <ul class="conflict-options">
+                                                @foreach (var option in conflict.ReferenceOptions)
+                                                {
+                                                    <li>@option.Source：@option.DisplayValue</li>
+                                                }
+                                            </ul>
+                                        }
+                                        else
+                                        {
+                                            @conflict.ReferenceValue
+                                        }
+                                    </td>
+                                    <td>
+                                        <select class="form-select" name="ConflictSelections[@conflict.ConflictId]">
+                                            @if (conflict.Source == "总模板")
+                                            {
+                                                <option value="primary" selected>采用总模板</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="primary">采用总模板</option>
+                                            }
+                                            @foreach (var option in conflict.ReferenceOptions)
+                                            {
+                                                if (conflict.Source == option.Source)
+                                                {
+                                                    <option value="@option.Source" selected>采用 @option.Source</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@option.Source">采用 @option.Source</option>
+                                                }
+                                            }
+                                            @if (conflict.Source == "本次自定义")
+                                            {
+                                                <option value="custom" selected>使用自定义</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="custom">使用自定义</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input class="form-control conflict-custom" name="ConflictCustomValues[@conflict.ConflictId]" value="@(conflict.Source == "本次自定义" ? conflict.SelectedValue : "")" placeholder="如：小四、楷体、居中对齐" />
+                                    </td>
+                                    <td>@(conflict.IsResolved ? $"已选择：{conflict.Source}（{conflict.SelectedValue}）" : "待确认")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn btn-warning" type="submit">保存本次规则选择</button>
+                </form>
+            </section>
+        }
+
         @if (Model.Session.TemplateAnalysis.Comments.Count > 0)
         {
             <details>

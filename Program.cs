@@ -19,6 +19,7 @@ builder.Services.AddSingleton<PunctuationIssueService>();
 builder.Services.AddSingleton<NormalDocumentService>();
 builder.Services.AddSingleton<WordTerminologyService>();
 builder.Services.AddSingleton<WordStyleResolver>();
+builder.Services.AddSingleton<TemplateRuleConflictService>();
 
 var app = builder.Build();
 

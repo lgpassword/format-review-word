@@ -21,16 +21,27 @@ public sealed class AnalysisSessionRepository
 
         var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT INTO AnalysisSessions
-                (Id, CreatedAt, TemplateFileName, TemplatePath, TemplateAnalysisJson)
+            INSERT OR REPLACE INTO AnalysisSessions
+                (Id, CreatedAt, TemplateFileName, TemplatePath, TemplateAnalysisJson,
+                 ReferenceTemplatesJson, RuleConflictsJson,
+                 TargetFileName, TargetPath, ReportJson, AnnotatedPath, HtmlReportPath)
             VALUES
-                ($id, $createdAt, $templateFileName, $templatePath, $templateAnalysisJson);
+                ($id, $createdAt, $templateFileName, $templatePath, $templateAnalysisJson,
+                 $referenceTemplatesJson, $ruleConflictsJson,
+                 $targetFileName, $targetPath, $reportJson, $annotatedPath, $htmlReportPath);
             """;
         command.Parameters.AddWithValue("$id", session.Id);
         command.Parameters.AddWithValue("$createdAt", session.CreatedAt.ToString("O"));
         command.Parameters.AddWithValue("$templateFileName", session.TemplateFileName);
         command.Parameters.AddWithValue("$templatePath", session.TemplatePath);
         command.Parameters.AddWithValue("$templateAnalysisJson", JsonSerializer.Serialize(session.TemplateAnalysis, JsonOptions));
+        command.Parameters.AddWithValue("$referenceTemplatesJson", JsonSerializer.Serialize(session.ReferenceTemplates, JsonOptions));
+        command.Parameters.AddWithValue("$ruleConflictsJson", JsonSerializer.Serialize(session.RuleConflicts, JsonOptions));
+        command.Parameters.AddWithValue("$targetFileName", (object?)session.TargetFileName ?? DBNull.Value);
+        command.Parameters.AddWithValue("$targetPath", (object?)session.TargetPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$reportJson", session.Report is null ? DBNull.Value : JsonSerializer.Serialize(session.Report, JsonOptions));
+        command.Parameters.AddWithValue("$annotatedPath", (object?)session.AnnotatedPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$htmlReportPath", (object?)session.HtmlReportPath ?? DBNull.Value);
 
         await command.ExecuteNonQueryAsync();
     }
@@ -43,6 +54,7 @@ public sealed class AnalysisSessionRepository
         var command = connection.CreateCommand();
         command.CommandText = """
             SELECT Id, CreatedAt, TemplateFileName, TemplatePath, TemplateAnalysisJson,
+                   ReferenceTemplatesJson, RuleConflictsJson,
                    TargetFileName, TargetPath, ReportJson, AnnotatedPath, HtmlReportPath
             FROM AnalysisSessions
             WHERE Id = $id;
@@ -62,11 +74,13 @@ public sealed class AnalysisSessionRepository
             TemplateFileName = reader.GetString(2),
             TemplatePath = reader.GetString(3),
             TemplateAnalysis = JsonSerializer.Deserialize<DocumentAnalysisResult>(reader.GetString(4), JsonOptions) ?? new(),
-            TargetFileName = reader.IsDBNull(5) ? null : reader.GetString(5),
-            TargetPath = reader.IsDBNull(6) ? null : reader.GetString(6),
-            Report = reader.IsDBNull(7) ? null : JsonSerializer.Deserialize<AnalysisReport>(reader.GetString(7), JsonOptions),
-            AnnotatedPath = reader.IsDBNull(8) ? null : reader.GetString(8),
-            HtmlReportPath = reader.IsDBNull(9) ? null : reader.GetString(9)
+            ReferenceTemplates = reader.IsDBNull(5) ? [] : JsonSerializer.Deserialize<List<TemplateReferenceAnalysis>>(reader.GetString(5), JsonOptions) ?? [],
+            RuleConflicts = reader.IsDBNull(6) ? [] : JsonSerializer.Deserialize<List<TemplateRuleConflict>>(reader.GetString(6), JsonOptions) ?? [],
+            TargetFileName = reader.IsDBNull(7) ? null : reader.GetString(7),
+            TargetPath = reader.IsDBNull(8) ? null : reader.GetString(8),
+            Report = reader.IsDBNull(9) ? null : JsonSerializer.Deserialize<AnalysisReport>(reader.GetString(9), JsonOptions),
+            AnnotatedPath = reader.IsDBNull(10) ? null : reader.GetString(10),
+            HtmlReportPath = reader.IsDBNull(11) ? null : reader.GetString(11)
         };
     }
 
@@ -82,6 +96,8 @@ public sealed class AnalysisSessionRepository
                 TargetPath = $targetPath,
                 ReportJson = $reportJson,
                 AnnotatedPath = $annotatedPath,
+                ReferenceTemplatesJson = $referenceTemplatesJson,
+                RuleConflictsJson = $ruleConflictsJson,
                 HtmlReportPath = $htmlReportPath
             WHERE Id = $id;
             """;
@@ -90,6 +106,8 @@ public sealed class AnalysisSessionRepository
         command.Parameters.AddWithValue("$targetPath", (object?)session.TargetPath ?? DBNull.Value);
         command.Parameters.AddWithValue("$reportJson", session.Report is null ? DBNull.Value : JsonSerializer.Serialize(session.Report, JsonOptions));
         command.Parameters.AddWithValue("$annotatedPath", (object?)session.AnnotatedPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$referenceTemplatesJson", JsonSerializer.Serialize(session.ReferenceTemplates, JsonOptions));
+        command.Parameters.AddWithValue("$ruleConflictsJson", JsonSerializer.Serialize(session.RuleConflicts, JsonOptions));
         command.Parameters.AddWithValue("$htmlReportPath", (object?)session.HtmlReportPath ?? DBNull.Value);
 
         await command.ExecuteNonQueryAsync();

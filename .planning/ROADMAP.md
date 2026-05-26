@@ -43,6 +43,13 @@ Candidate work:
 - Current-session rule storage in SQLite and HTML report capture.
 - Re-check only affected document areas after a rule is confirmed.
 
+Current implementation scope:
+
+- Upload one or more qualified reference templates after the primary template.
+- Detect conflicts for common font, common font size, paragraph alignment, paragraph spacing, line spacing, first-line indent, and common table column count.
+- Show all reference-template values for the same rule, let the user choose the primary template, a reference template, or a custom Word-style value.
+- Persist reference templates and conflict choices in SQLite and apply the selected baseline to checking and normal document generation.
+
 ## Phase 4: Background Jobs And Advanced Reports
 
 Goal: Improve user experience after MVP.
