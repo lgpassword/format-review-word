@@ -11,6 +11,38 @@ public sealed class DocumentAnalysisResult
     public List<UncheckedItem> UncheckedItems { get; set; } = [];
     public PageSetupSnapshot PageSetup { get; set; } = new();
     public TemplateBaseline Baseline { get; set; } = new();
+    public List<TemplateFormatRule> FormatRules { get; set; } = [];
+}
+
+public sealed class TemplateFormatRule
+{
+    public string RuleId { get; set; } = "";
+    public string Area { get; set; } = "";
+    public string BlockType { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Source { get; set; } = "模板";
+    public string ChineseFontName { get; set; } = "";
+    public string ChineseFontNameRaw { get; set; } = "";
+    public string WesternFontName { get; set; } = "";
+    public string WesternFontNameRaw { get; set; } = "";
+    public string FontSize { get; set; } = "";
+    public string FontSizeRaw { get; set; } = "";
+    public string Justification { get; set; } = "";
+    public string JustificationRaw { get; set; } = "";
+    public string SpacingBefore { get; set; } = "";
+    public string SpacingBeforeRaw { get; set; } = "";
+    public string SpacingAfter { get; set; } = "";
+    public string SpacingAfterRaw { get; set; } = "";
+    public string LineSpacing { get; set; } = "";
+    public string LineSpacingRaw { get; set; } = "";
+    public string FirstLineIndent { get; set; } = "";
+    public string FirstLineIndentRaw { get; set; } = "";
+}
+
+public sealed class IssueSummary
+{
+    public string Name { get; set; } = "";
+    public int Count { get; set; }
 }
 
 public sealed class TemplateReferenceAnalysis
@@ -218,6 +250,9 @@ public sealed class AnalysisReport
     public string TargetFileName { get; set; } = "";
     public string Conclusion { get; set; } = "";
     public List<FormatIssue> Issues { get; set; } = [];
+    public List<IssueSummary> AreaSummaries { get; set; } = [];
+    public List<IssueSummary> CategorySummaries { get; set; } = [];
+    public List<IssueSummary> SeveritySummaries { get; set; } = [];
     public List<CoverageAreaSummary> CoverageAreas { get; set; } = [];
     public List<UncheckedItem> UncheckedItems { get; set; } = [];
     public string AnnotatedWordDownloadName { get; set; } = "";
@@ -232,6 +267,7 @@ public sealed class AnalysisSession
     public string TemplateFileName { get; set; } = "";
     public string TemplatePath { get; set; } = "";
     public DocumentAnalysisResult TemplateAnalysis { get; set; } = new();
+    public List<TemplateFormatRule> EffectiveRules { get; set; } = [];
     public List<TemplateReferenceAnalysis> ReferenceTemplates { get; set; } = [];
     public List<TemplateRuleConflict> RuleConflicts { get; set; } = [];
     public string? TargetFileName { get; set; }

@@ -19,6 +19,8 @@ builder.Services.AddSingleton<PunctuationIssueService>();
 builder.Services.AddSingleton<NormalDocumentService>();
 builder.Services.AddSingleton<WordTerminologyService>();
 builder.Services.AddSingleton<WordStyleResolver>();
+builder.Services.AddSingleton<TemplateRuleValueNormalizer>();
+builder.Services.AddSingleton<TemplateRuleService>();
 builder.Services.AddSingleton<TemplateRuleConflictService>();
 builder.Services.AddSingleton<EffectiveTemplateService>();
 

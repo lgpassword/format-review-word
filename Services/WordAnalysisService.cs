@@ -8,11 +8,13 @@ public sealed class WordAnalysisService
 {
     private readonly WordStyleResolver _styleResolver;
     private readonly WordTerminologyService _terminology;
+    private readonly TemplateRuleService _templateRules;
 
-    public WordAnalysisService(WordStyleResolver styleResolver, WordTerminologyService terminology)
+    public WordAnalysisService(WordStyleResolver styleResolver, WordTerminologyService terminology, TemplateRuleService templateRules)
     {
         _styleResolver = styleResolver;
         _terminology = terminology;
+        _templateRules = templateRules;
     }
 
     public DocumentAnalysisResult Analyze(string path, string fileName)
@@ -34,6 +36,7 @@ public sealed class WordAnalysisService
         result.CoverageAreas = BuildCoverage(result);
         result.UncheckedItems = BuildUncheckedItems(result);
         result.Baseline = BuildBaseline(result);
+        result.FormatRules = _templateRules.BuildRules(result, "模板");
         return result;
     }
 

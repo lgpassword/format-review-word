@@ -6,9 +6,17 @@ namespace WordFormatAnalyzer.Services;
 
 public sealed class NormalDocumentService
 {
+    private readonly WordAnalysisService _analysis;
+
+    public NormalDocumentService(WordAnalysisService analysis)
+    {
+        _analysis = analysis;
+    }
+
     public string CreateNormalizedCopy(string targetPath, string outputPath, DocumentAnalysisResult template, IReadOnlyList<FormatIssue> issues)
     {
         File.Copy(targetPath, outputPath, overwrite: true);
+        var targetAnalysis = _analysis.Analyze(outputPath, Path.GetFileName(outputPath));
 
         using var document = WordprocessingDocument.Open(outputPath, true);
         var mainPart = document.MainDocumentPart ?? throw new InvalidOperationException("Word document has no main document part.");
@@ -16,7 +24,7 @@ public sealed class NormalDocumentService
         var paragraphs = body.Descendants<Paragraph>().ToList();
 
         ApplyPageSetup(body, template.Baseline.PageSetup);
-        ApplyTemplateDefaults(paragraphs, template.Baseline);
+        ApplyTemplateRules(paragraphs, targetAnalysis.Paragraphs, template.FormatRules, template.Baseline);
         NormalizePunctuation(paragraphs);
         mainPart.Document.Save();
         return outputPath;
@@ -44,73 +52,80 @@ public sealed class NormalDocumentService
         }
     }
 
-    private static void ApplyTemplateDefaults(IEnumerable<Paragraph> paragraphs, TemplateBaseline baseline)
+    private static void ApplyTemplateRules(
+        IReadOnlyList<Paragraph> paragraphs,
+        IReadOnlyList<ParagraphSnapshot> snapshots,
+        IReadOnlyList<TemplateFormatRule> rules,
+        TemplateBaseline baseline)
     {
-        foreach (var paragraph in paragraphs)
+        for (var i = 0; i < paragraphs.Count && i < snapshots.Count; i++)
         {
+            var paragraph = paragraphs[i];
+            var snapshot = snapshots[i];
+            var rule = FindRule(rules, snapshot);
             var pPr = paragraph.ParagraphProperties ?? paragraph.PrependChild(new ParagraphProperties());
-            var justification = ParseJustification(string.IsNullOrWhiteSpace(baseline.CommonJustificationRaw) ? baseline.CommonJustification : baseline.CommonJustificationRaw);
+            var justificationRaw = FirstNonEmpty(rule?.JustificationRaw, baseline.CommonJustificationRaw, rule?.Justification, baseline.CommonJustification);
+            var justification = ParseJustification(justificationRaw);
             if (justification is not null)
             {
                 pPr.Justification = new Justification { Val = justification.Value };
             }
 
             pPr.SpacingBetweenLines ??= new SpacingBetweenLines();
-            if (!string.IsNullOrWhiteSpace(baseline.CommonSpacingBeforeRaw))
+            var spacingBefore = FirstNonEmpty(rule?.SpacingBeforeRaw, baseline.CommonSpacingBeforeRaw);
+            if (!string.IsNullOrWhiteSpace(spacingBefore))
             {
-                pPr.SpacingBetweenLines.Before = baseline.CommonSpacingBeforeRaw;
+                pPr.SpacingBetweenLines.Before = spacingBefore;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonSpacingAfterRaw))
+            var spacingAfter = FirstNonEmpty(rule?.SpacingAfterRaw, baseline.CommonSpacingAfterRaw);
+            if (!string.IsNullOrWhiteSpace(spacingAfter))
             {
-                pPr.SpacingBetweenLines.After = baseline.CommonSpacingAfterRaw;
+                pPr.SpacingBetweenLines.After = spacingAfter;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonLineSpacingRaw))
+            var lineSpacing = FirstNonEmpty(rule?.LineSpacingRaw, baseline.CommonLineSpacingRaw);
+            if (!string.IsNullOrWhiteSpace(lineSpacing))
             {
-                pPr.SpacingBetweenLines.Line = baseline.CommonLineSpacingRaw;
+                pPr.SpacingBetweenLines.Line = lineSpacing;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonFirstLineIndentRaw))
+            var firstLineIndent = FirstNonEmpty(rule?.FirstLineIndentRaw, baseline.CommonFirstLineIndentRaw);
+            if (!string.IsNullOrWhiteSpace(firstLineIndent))
             {
                 pPr.Indentation ??= new Indentation();
-                pPr.Indentation.FirstLine = baseline.CommonFirstLineIndentRaw;
+                pPr.Indentation.FirstLine = firstLineIndent;
             }
 
-            ApplyRunDefaults(paragraph, baseline);
+            ApplyRunDefaults(paragraph, rule, baseline);
         }
     }
 
-    private static void ApplyRunDefaults(Paragraph paragraph, TemplateBaseline baseline)
+    private static void ApplyRunDefaults(Paragraph paragraph, TemplateFormatRule? rule, TemplateBaseline baseline)
     {
         foreach (var run in paragraph.Descendants<Run>())
         {
             var runProperties = run.RunProperties ?? run.PrependChild(new RunProperties());
-            if (!string.IsNullOrWhiteSpace(baseline.CommonFontNameRaw))
+            var chineseFont = FirstNonEmpty(rule?.ChineseFontNameRaw, baseline.CommonChineseFontNameRaw);
+            if (!string.IsNullOrWhiteSpace(chineseFont))
             {
                 runProperties.RunFonts ??= new RunFonts();
-                runProperties.RunFonts.EastAsia = baseline.CommonFontNameRaw;
-                runProperties.RunFonts.Ascii = baseline.CommonFontNameRaw;
-                runProperties.RunFonts.HighAnsi = baseline.CommonFontNameRaw;
+                runProperties.RunFonts.EastAsia = chineseFont;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonChineseFontNameRaw))
+            var westernFont = FirstNonEmpty(rule?.WesternFontNameRaw, baseline.CommonWesternFontNameRaw);
+            if (!string.IsNullOrWhiteSpace(westernFont))
             {
                 runProperties.RunFonts ??= new RunFonts();
-                runProperties.RunFonts.EastAsia = baseline.CommonChineseFontNameRaw;
+                runProperties.RunFonts.Ascii = westernFont;
+                runProperties.RunFonts.HighAnsi = westernFont;
             }
 
-            if (!string.IsNullOrWhiteSpace(baseline.CommonWesternFontNameRaw))
+            var fontSize = FirstNonEmpty(rule?.FontSizeRaw, baseline.CommonFontSizeRaw);
+            if (!string.IsNullOrWhiteSpace(fontSize))
             {
-                runProperties.RunFonts ??= new RunFonts();
-                runProperties.RunFonts.Ascii = baseline.CommonWesternFontNameRaw;
-                runProperties.RunFonts.HighAnsi = baseline.CommonWesternFontNameRaw;
-            }
-
-            if (!string.IsNullOrWhiteSpace(baseline.CommonFontSizeRaw))
-            {
-                runProperties.FontSize = new FontSize { Val = baseline.CommonFontSizeRaw };
-                runProperties.FontSizeComplexScript = new FontSizeComplexScript { Val = baseline.CommonFontSizeRaw };
+                runProperties.FontSize = new FontSize { Val = fontSize };
+                runProperties.FontSizeComplexScript = new FontSizeComplexScript { Val = fontSize };
             }
         }
     }
@@ -171,5 +186,17 @@ public sealed class NormalDocumentService
             "distribute" => JustificationValues.Distribute,
             _ => null
         };
+    }
+
+    private static TemplateFormatRule? FindRule(IEnumerable<TemplateFormatRule> rules, ParagraphSnapshot paragraph)
+    {
+        return rules.FirstOrDefault(rule =>
+            string.Equals(rule.Area, paragraph.Area, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(rule.BlockType, paragraph.BlockType, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "";
     }
 }

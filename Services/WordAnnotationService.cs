@@ -30,11 +30,14 @@ public sealed class WordAnnotationService
 
         var body = mainPart.Document.Body ?? throw new InvalidOperationException("Word document has no body.");
         var paragraphs = body.Descendants<Paragraph>().ToList();
+        if (paragraphs.Count == 0)
+        {
+            return outputPath;
+        }
 
         foreach (var issue in issues.Take(200))
         {
-            var paragraphIndex = ResolveParagraphIndex(issue.TargetElementId, paragraphs.Count);
-            var paragraph = paragraphs[paragraphIndex];
+            var paragraph = ResolveTargetParagraph(issue.TargetElementId, body, paragraphs);
             AddComment(paragraph, commentsPart.Comments, nextId.ToString(), BuildCommentText(issue));
             nextId++;
         }
@@ -42,6 +45,23 @@ public sealed class WordAnnotationService
         commentsPart.Comments.Save();
         mainPart.Document.Save();
         return outputPath;
+    }
+
+    private static Paragraph ResolveTargetParagraph(string targetElementId, Body body, IReadOnlyList<Paragraph> paragraphs)
+    {
+        if (targetElementId.StartsWith("t:", StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(targetElementId[2..], out var tableIndex))
+        {
+            var table = body.Descendants<Table>().ElementAtOrDefault(tableIndex);
+            var tableParagraph = table?.Descendants<Paragraph>().FirstOrDefault();
+            if (tableParagraph is not null)
+            {
+                return tableParagraph;
+            }
+        }
+
+        var paragraphIndex = ResolveParagraphIndex(targetElementId, paragraphs.Count);
+        return paragraphs[paragraphIndex];
     }
 
     private static int ResolveParagraphIndex(string targetElementId, int paragraphCount)

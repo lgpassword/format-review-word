@@ -19,6 +19,7 @@ public class IndexModel : PageModel
     private readonly IssueTextService _issueText;
     private readonly TemplateRuleConflictService _ruleConflicts;
     private readonly EffectiveTemplateService _effectiveTemplate;
+    private readonly TemplateRuleService _templateRules;
 
     public IndexModel(
         AppStorage storage,
@@ -31,7 +32,8 @@ public class IndexModel : PageModel
         NormalDocumentService normalDocument,
         IssueTextService issueText,
         TemplateRuleConflictService ruleConflicts,
-        EffectiveTemplateService effectiveTemplate)
+        EffectiveTemplateService effectiveTemplate,
+        TemplateRuleService templateRules)
     {
         _storage = storage;
         _sessions = sessions;
@@ -44,6 +46,7 @@ public class IndexModel : PageModel
         _issueText = issueText;
         _ruleConflicts = ruleConflicts;
         _effectiveTemplate = effectiveTemplate;
+        _templateRules = templateRules;
     }
 
     [BindProperty]
@@ -63,6 +66,9 @@ public class IndexModel : PageModel
 
     [BindProperty]
     public Dictionary<string, string> ConflictCustomValues { get; set; } = [];
+
+    [BindProperty]
+    public Dictionary<string, TemplateRuleEditInput> RuleEdits { get; set; } = [];
 
     [BindProperty(SupportsGet = true)]
     public string? Severity { get; set; }
@@ -112,7 +118,8 @@ public class IndexModel : PageModel
             CreatedAt = DateTime.Now,
             TemplateFileName = TemplateFile.FileName,
             TemplatePath = path,
-            TemplateAnalysis = analysis
+            TemplateAnalysis = analysis,
+            EffectiveRules = analysis.FormatRules.Select(TemplateRuleService.Clone).ToList()
         };
 
         await _sessions.SaveTemplateAsync(session);
@@ -221,6 +228,7 @@ public class IndexModel : PageModel
         });
 
         _ruleConflicts.MergeConflicts(session.RuleConflicts, _ruleConflicts.FindConflicts(session.TemplateAnalysis, analysis));
+        session.EffectiveRules = _templateRules.MergeRules(session.EffectiveRules, analysis.FormatRules);
 
         await _sessions.SaveTemplateAsync(session);
         return RedirectToPage(new { sessionId = session.Id });
@@ -252,6 +260,33 @@ public class IndexModel : PageModel
             _ruleConflicts.ResolveConflict(conflict, selected, customValue);
         }
 
+        var currentRules = session.EffectiveRules.Count > 0
+            ? session.EffectiveRules
+            : session.TemplateAnalysis.FormatRules;
+        session.EffectiveRules = _templateRules.ApplyResolvedConflicts(currentRules, session.RuleConflicts);
+        await _sessions.SaveTemplateAsync(session);
+        return RedirectToPage(new { sessionId = session.Id });
+    }
+
+    public async Task<IActionResult> OnPostSaveRulesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SessionId))
+        {
+            ModelState.AddModelError(string.Empty, "请先上传总模板。");
+            return Page();
+        }
+
+        var session = await _sessions.GetAsync(SessionId);
+        if (session is null)
+        {
+            ModelState.AddModelError(string.Empty, "模板分析会话不存在，请重新上传模板。");
+            return Page();
+        }
+
+        var currentRules = session.EffectiveRules.Count > 0
+            ? session.EffectiveRules
+            : session.TemplateAnalysis.FormatRules;
+        session.EffectiveRules = _templateRules.ApplyEdits(currentRules, RuleEdits);
         await _sessions.SaveTemplateAsync(session);
         return RedirectToPage(new { sessionId = session.Id });
     }
@@ -292,6 +327,11 @@ public class IndexModel : PageModel
         }
 
         Session = await _sessions.GetAsync(SessionId);
+        if (Session is not null && Session.EffectiveRules.Count == 0)
+        {
+            Session.EffectiveRules = Session.TemplateAnalysis.FormatRules.Select(TemplateRuleService.Clone).ToList();
+        }
+
         VisibleIssues = ApplyFilters(Session?.Report?.Issues ?? []);
     }
 

@@ -77,7 +77,7 @@
                 <form method="post" asp-page-handler="ResolveConflicts">
                     <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
                     <div class="table-responsive">
-                        <table class="table table-sm issue-table">
+                        <table class="table table-sm issue-table rule-table">
                             <thead>
                             <tr>
                                 <th>规则</th>
@@ -154,6 +154,55 @@
             </section>
         }
 
+        @if (Model.Session.EffectiveRules.Count > 0)
+        {
+            <details open>
+                <summary>查看和编辑本次采用的格式规则：@Model.Session.EffectiveRules.Count 条</summary>
+                <form method="post" asp-page-handler="SaveRules">
+                    <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
+                    <div class="table-responsive">
+                        <table class="table table-sm issue-table">
+                            <thead>
+                            <tr>
+                                <th>区域/块</th>
+                                <th>中文字体</th>
+                                <th>西文字体</th>
+                                <th>字号</th>
+                                <th>对齐</th>
+                                <th>段前</th>
+                                <th>段后</th>
+                                <th>行距</th>
+                                <th>首行缩进</th>
+                                <th>来源</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var rule in Model.Session.EffectiveRules)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@rule.Area</strong><br />
+                                        <span class="muted">@rule.BlockType</span>
+                                    </td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].ChineseFontName" value="@rule.ChineseFontName" /></td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].WesternFontName" value="@rule.WesternFontName" /></td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].FontSize" value="@rule.FontSize" /></td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].Justification" value="@rule.Justification" /></td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].SpacingBefore" value="@rule.SpacingBefore" /></td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].SpacingAfter" value="@rule.SpacingAfter" /></td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].LineSpacing" value="@rule.LineSpacing" /></td>
+                                    <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].FirstLineIndent" value="@rule.FirstLineIndent" /></td>
+                                    <td>@rule.Source</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn btn-warning" type="submit">保存本次规则</button>
+                </form>
+            </details>
+        }
+
         @if (Model.Session.TemplateAnalysis.Comments.Count > 0)
         {
             <details>
@@ -194,6 +243,36 @@
             <div><dt>检测结论</dt><dd>@report.Conclusion</dd></div>
             <div><dt>问题总数</dt><dd>@report.Issues.Count</dd></div>
         </dl>
+
+        <div class="summary-columns">
+            <section>
+                <h3>按区域统计</h3>
+                <ul class="comment-list">
+                    @foreach (var item in report.AreaSummaries)
+                    {
+                        <li>@item.Name：@item.Count</li>
+                    }
+                </ul>
+            </section>
+            <section>
+                <h3>按问题类型统计</h3>
+                <ul class="comment-list">
+                    @foreach (var item in report.CategorySummaries)
+                    {
+                        <li>@item.Name：@item.Count</li>
+                    }
+                </ul>
+            </section>
+            <section>
+                <h3>按严重程度统计</h3>
+                <ul class="comment-list">
+                    @foreach (var item in report.SeveritySummaries)
+                    {
+                        <li>@item.Name：@item.Count</li>
+                    }
+                </ul>
+            </section>
+        </div>
 
         @if (report.CoverageAreas.Count > 0)
         {

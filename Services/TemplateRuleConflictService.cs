@@ -14,7 +14,6 @@ public sealed class TemplateRuleConflictService
     public List<TemplateRuleConflict> FindConflicts(DocumentAnalysisResult primary, DocumentAnalysisResult reference)
     {
         var conflicts = new List<TemplateRuleConflict>();
-        AddConflict(conflicts, "字体字号", "常见字体", primary.Baseline.CommonFontName, reference.Baseline.CommonFontName, primary.Baseline.CommonFontNameRaw, reference.Baseline.CommonFontNameRaw, reference.FileName);
         AddConflict(conflicts, "字体字号", "常见中文字体", primary.Baseline.CommonChineseFontName, reference.Baseline.CommonChineseFontName, primary.Baseline.CommonChineseFontNameRaw, reference.Baseline.CommonChineseFontNameRaw, reference.FileName);
         AddConflict(conflicts, "字体字号", "常见西文字体", primary.Baseline.CommonWesternFontName, reference.Baseline.CommonWesternFontName, primary.Baseline.CommonWesternFontNameRaw, reference.Baseline.CommonWesternFontNameRaw, reference.FileName);
         AddConflict(conflicts, "字体字号", "常见字号", primary.Baseline.CommonFontSize, reference.Baseline.CommonFontSize, primary.Baseline.CommonFontSizeRaw, reference.Baseline.CommonFontSizeRaw, reference.FileName);
@@ -54,10 +53,6 @@ public sealed class TemplateRuleConflictService
         {
             switch (conflict.RuleName)
             {
-                case "常见字体":
-                    baseline.CommonFontName = conflict.SelectedValue;
-                    baseline.CommonFontNameRaw = conflict.RawSelectedValue;
-                    break;
                 case "常见中文字体":
                     baseline.CommonChineseFontName = conflict.SelectedValue;
                     baseline.CommonChineseFontNameRaw = conflict.RawSelectedValue;
@@ -197,7 +192,6 @@ public sealed class TemplateRuleConflictService
         var trimmed = value.Trim();
         return ruleName switch
         {
-            "常见字体" => (_terms.FontName(trimmed), trimmed),
             "常见中文字体" => (_terms.FontName(trimmed), trimmed),
             "常见西文字体" => (_terms.FontName(trimmed), trimmed),
             "常见字号" => NormalizeFontSize(trimmed),

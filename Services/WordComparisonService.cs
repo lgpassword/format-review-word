@@ -19,8 +19,8 @@ public sealed class WordComparisonService
         var baseline = template.Baseline;
 
         AddPageSetupIssues(issues, baseline.PageSetup, target.PageSetup);
-        AddParagraphIssues(issues, template.Paragraphs, baseline, target.Paragraphs);
-        AddRunIssues(issues, template.Paragraphs, baseline, target.Paragraphs);
+        AddParagraphIssues(issues, template.Paragraphs, template.FormatRules, baseline, target.Paragraphs);
+        AddRunIssues(issues, template.Paragraphs, template.FormatRules, baseline, target.Paragraphs);
         AddTableIssues(issues, baseline, target.Tables);
         AddBlankAreaIssues(issues, target.BlankAreas);
         AddPunctuationIssues(issues, template, target);
@@ -32,8 +32,11 @@ public sealed class WordComparisonService
             CreatedAt = DateTime.Now,
             TemplateFileName = template.FileName,
             TargetFileName = target.FileName,
-            Conclusion = issues.Any(issue => issue.Severity is "严重" or "错误") ? "未达到合格标准" : "未发现明显格式问题",
+            Conclusion = issues.Any(issue => issue.Severity == "错误") ? "未达到合格标准" : "未发现明显格式问题",
             Issues = issues,
+            AreaSummaries = BuildSummaries(issues.Select(issue => string.IsNullOrWhiteSpace(issue.Area) ? "未分类" : issue.Area)),
+            CategorySummaries = BuildSummaries(issues.Select(issue => issue.Category)),
+            SeveritySummaries = BuildSummaries(issues.Select(issue => issue.Severity)),
             CoverageAreas = target.CoverageAreas,
             UncheckedItems = target.UncheckedItems
         };
@@ -42,6 +45,7 @@ public sealed class WordComparisonService
     private void AddParagraphIssues(
         List<FormatIssue> issues,
         IReadOnlyList<ParagraphSnapshot> templateParagraphs,
+        IReadOnlyList<TemplateFormatRule> rules,
         TemplateBaseline baseline,
         IEnumerable<ParagraphSnapshot> paragraphs)
     {
@@ -49,13 +53,14 @@ public sealed class WordComparisonService
         {
             AddUnmatchedBlockIssueIfNeeded(issues, templateParagraphs, paragraph);
 
-            var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.ChineseFontName, baseline.CommonChineseFontName);
-            var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.WesternFontName, baseline.CommonWesternFontName);
-            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontSize, baseline.CommonFontSize);
-            var expectedJustification = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.Justification, baseline.CommonJustification);
-            var expectedSpacingBefore = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.SpacingBefore, baseline.CommonSpacingBefore);
-            var expectedSpacingAfter = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.SpacingAfter, baseline.CommonSpacingAfter);
-            var expectedLineSpacing = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.LineSpacing, baseline.CommonLineSpacing);
+            var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.ChineseFontName, r => r.ChineseFontName, baseline.CommonChineseFontName);
+            var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.WesternFontName, r => r.WesternFontName, baseline.CommonWesternFontName);
+            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.FontSize, r => r.FontSize, baseline.CommonFontSize);
+            var expectedJustification = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.Justification, r => r.Justification, baseline.CommonJustification);
+            var expectedSpacingBefore = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.SpacingBefore, r => r.SpacingBefore, baseline.CommonSpacingBefore);
+            var expectedSpacingAfter = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.SpacingAfter, r => r.SpacingAfter, baseline.CommonSpacingAfter);
+            var expectedLineSpacing = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.LineSpacing, r => r.LineSpacing, baseline.CommonLineSpacing);
+            var expectedFirstLineIndent = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.FirstLineIndent, r => r.FirstLineIndent, baseline.CommonFirstLineIndent);
 
             if (paragraph.Text.Any(IsCjkCharacter))
             {
@@ -83,6 +88,9 @@ public sealed class WordComparisonService
 
             AddIfDifferent(issues, "S", "错误", "段落", paragraph, "行距不符合模板",
                 expectedLineSpacing, paragraph.LineSpacing, $"打开段落设置，将行距改为 {expectedLineSpacing}。");
+
+            AddIfDifferent(issues, "S", "错误", "段落", paragraph, "首行缩进不符合模板",
+                expectedFirstLineIndent, paragraph.FirstLineIndent, $"打开段落设置，将首行缩进改为 {expectedFirstLineIndent}。");
         }
     }
 
@@ -99,7 +107,7 @@ public sealed class WordComparisonService
         issues.Add(new FormatIssue
         {
             IssueCode = NextCode("I"),
-            Severity = "提醒",
+            Severity = "需确认",
             Category = "块匹配",
             Location = LocationText(paragraph),
             TargetElementId = paragraph.TargetElementId,
@@ -116,6 +124,7 @@ public sealed class WordComparisonService
     private void AddRunIssues(
         List<FormatIssue> issues,
         IReadOnlyList<ParagraphSnapshot> templateParagraphs,
+        IReadOnlyList<TemplateFormatRule> rules,
         TemplateBaseline baseline,
         IEnumerable<ParagraphSnapshot> paragraphs)
     {
@@ -129,9 +138,9 @@ public sealed class WordComparisonService
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
             var templateParagraph = FindTemplateParagraph(templateParagraphs, paragraph);
-            var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.ChineseFontName, baseline.CommonChineseFontName);
-            var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.WesternFontName, baseline.CommonWesternFontName);
-            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontSize, baseline.CommonFontSize);
+            var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.ChineseFontName, r => r.ChineseFontName, baseline.CommonChineseFontName);
+            var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.WesternFontName, r => r.WesternFontName, baseline.CommonWesternFontName);
+            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.FontSize, r => r.FontSize, baseline.CommonFontSize);
 
             var mismatchedChineseFonts = paragraph.Runs
                 .Where(run => run.CjkCharacterCount > 0)
@@ -246,7 +255,7 @@ public sealed class WordComparisonService
             issues.Add(new FormatIssue
             {
                 IssueCode = NextCode("B"),
-                Severity = "提醒",
+                Severity = "需确认",
                 Category = "大空白",
                 Location = finding.Location,
                 TargetElementId = finding.TargetElementId,
@@ -307,7 +316,7 @@ public sealed class WordComparisonService
             issues.Add(new FormatIssue
             {
                 IssueCode = NextCode("P"),
-                Severity = "严重",
+                Severity = "错误",
                 Category = "页面设置",
                 Location = "全文页面设置",
                 TargetElementId = "p:0",
@@ -329,7 +338,7 @@ public sealed class WordComparisonService
         issues.Add(new FormatIssue
         {
             IssueCode = NextCode("P"),
-            Severity = "严重",
+            Severity = "错误",
             Category = "页面设置",
             Location = "全文页面设置",
             TargetElementId = "p:0",
@@ -382,10 +391,22 @@ public sealed class WordComparisonService
 
     private static string ExpectedParagraphValue(
         IReadOnlyList<ParagraphSnapshot> templateParagraphs,
+        IReadOnlyList<TemplateFormatRule> rules,
         ParagraphSnapshot targetParagraph,
         Func<ParagraphSnapshot, string> selector,
+        Func<TemplateFormatRule, string> ruleSelector,
         string fallback)
     {
+        var rule = FindRule(rules, targetParagraph);
+        if (rule is not null)
+        {
+            var value = ruleSelector(rule);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
         var templateParagraph = FindTemplateParagraph(templateParagraphs, targetParagraph);
 
         if (templateParagraph is not null && !templateParagraph.IsEmpty)
@@ -400,6 +421,13 @@ public sealed class WordComparisonService
         }
 
         return targetParagraph.Area == "正文" ? fallback : "";
+    }
+
+    private static TemplateFormatRule? FindRule(IReadOnlyList<TemplateFormatRule> rules, ParagraphSnapshot paragraph)
+    {
+        return rules.FirstOrDefault(rule =>
+            string.Equals(rule.Area, paragraph.Area, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(rule.BlockType, paragraph.BlockType, StringComparison.OrdinalIgnoreCase));
     }
 
     private static ParagraphSnapshot? FindTemplateParagraph(IReadOnlyList<ParagraphSnapshot> templateParagraphs, ParagraphSnapshot targetParagraph)
@@ -472,9 +500,7 @@ public sealed class WordComparisonService
 
     private static string LocationText(ParagraphSnapshot paragraph)
     {
-        return paragraph.Area == "正文"
-            ? $"第 {paragraph.Index} 段"
-            : $"{paragraph.Area} / {paragraph.BlockType}（第 {paragraph.Index} 段）";
+        return $"{paragraph.Area} / {paragraph.BlockType}（第 {paragraph.Index} 段）";
     }
 
     private static string ExpectedRunValue(
@@ -484,6 +510,11 @@ public sealed class WordComparisonService
         Func<RunFormatSnapshot, string> selector,
         string paragraphFallback)
     {
+        if (!string.IsNullOrWhiteSpace(paragraphFallback))
+        {
+            return paragraphFallback;
+        }
+
         var templateRun = templateParagraph?.Runs.FirstOrDefault(run => run.Index == runIndex);
         if (templateRun is not null)
         {
@@ -497,5 +528,16 @@ public sealed class WordComparisonService
         }
 
         return templateParagraph is null && targetParagraph.Area == "正文" ? paragraphFallback : "";
+    }
+
+    private static List<IssueSummary> BuildSummaries(IEnumerable<string> names)
+    {
+        return names
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .GroupBy(name => name)
+            .Select(group => new IssueSummary { Name = group.Key, Count = group.Count() })
+            .OrderByDescending(summary => summary.Count)
+            .ThenBy(summary => summary.Name)
+            .ToList();
     }
 }

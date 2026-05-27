@@ -36,10 +36,11 @@ public sealed class IssueTextService
     {
         return $"""
             问题编号：{issue.IssueCode}
-            问题：{BuildShortTitle(issue)}
-            位置：{issue.Location}
-            应该这样：{NormalizeValue(issue.Expected)}
-            现在是：{NormalizeValue(issue.Actual)}
+            问题类型：{issue.Category}
+            所属位置：{LocationText(issue)}
+            发现问题：{BuildShortTitle(issue)}
+            当前情况：{NormalizeValue(issue.Actual)}
+            应改为：{NormalizeValue(issue.Expected)}
             修改办法：{issue.Suggestion}
             """;
     }
@@ -61,6 +62,17 @@ public sealed class IssueTextService
 
     private static string NormalizeValue(string value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "未识别或未设置" : value;
+        return string.IsNullOrWhiteSpace(value) ? "未识别，请按 Word 对话框核对" : value;
+    }
+
+    private static string LocationText(FormatIssue issue)
+    {
+        if (!string.IsNullOrWhiteSpace(issue.Area) &&
+            !issue.Location.Contains(issue.Area, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{issue.Area} / {issue.Location}";
+        }
+
+        return issue.Location;
     }
 }

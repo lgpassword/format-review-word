@@ -107,6 +107,33 @@ body {
   font-weight: 600;
 }
 
+.summary-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.summary-columns section {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  background: #fff;
+}
+
+.summary-columns h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+.rule-table input.form-control-sm {
+  min-width: 96px;
+}
+
 .comment-list {
   margin-top: 10px;
 }

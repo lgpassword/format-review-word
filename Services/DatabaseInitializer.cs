@@ -26,6 +26,7 @@ public sealed class DatabaseInitializer
                 TemplateAnalysisJson TEXT NOT NULL,
                 ReferenceTemplatesJson TEXT NULL,
                 RuleConflictsJson TEXT NULL,
+                EffectiveRulesJson TEXT NULL,
                 TargetFileName TEXT NULL,
                 TargetPath TEXT NULL,
                 ReportJson TEXT NULL,
@@ -37,6 +38,8 @@ public sealed class DatabaseInitializer
         await command.ExecuteNonQueryAsync();
         await AddColumnIfMissingAsync(connection, "ReferenceTemplatesJson", "TEXT NULL");
         await AddColumnIfMissingAsync(connection, "RuleConflictsJson", "TEXT NULL");
+        await AddColumnIfMissingAsync(connection, "EffectiveRulesJson", "TEXT NULL");
+        await AddColumnIfMissingAsync(connection, "HtmlReportPath", "TEXT NULL");
     }
 
     private static async Task AddColumnIfMissingAsync(SqliteConnection connection, string columnName, string definition)

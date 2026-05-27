@@ -25,7 +25,7 @@ public sealed class ReportRenderService
         var builder = new StringBuilder();
         builder.AppendLine("<!doctype html>");
         builder.AppendLine("<html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><title>格式检测报告</title>");
-        builder.AppendLine("<style>body{font-family:Arial,'Microsoft YaHei',sans-serif;margin:24px;color:#1f2937}table{border-collapse:collapse;width:100%;margin-top:16px}th,td{border:1px solid #d1d5db;padding:8px;text-align:left;vertical-align:top}th{background:#f3f4f6}.summary{display:flex;gap:16px;flex-wrap:wrap}.box{border:1px solid #d1d5db;padding:12px;min-width:160px}.sev{font-weight:700;color:#b91c1c}.muted{color:#6b7280}</style>");
+        builder.AppendLine("<style>body{font-family:Arial,'Microsoft YaHei',sans-serif;margin:24px;color:#1f2937}table{border-collapse:collapse;width:100%;margin-top:16px}th,td{border:1px solid #d1d5db;padding:8px;text-align:left;vertical-align:top}th{background:#f3f4f6}.summary{display:flex;gap:16px;flex-wrap:wrap}.summary.columns .box{flex:1 1 220px}.box{border:1px solid #d1d5db;padding:12px;min-width:160px}.box ul{margin:8px 0 0;padding-left:18px}.sev{font-weight:700;color:#b91c1c}.muted{color:#6b7280}</style>");
         builder.AppendLine("</head><body>");
         builder.AppendLine("<h1>Word 格式检测报告</h1>");
         builder.AppendLine($"<p class=\"muted\">报告编号：{Encode(report.ReportId)}　生成时间：{Encode(report.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"))}</p>");
@@ -35,6 +35,7 @@ public sealed class ReportRenderService
         builder.AppendLine($"<div class=\"box\"><strong>检测结论</strong><br>{Encode(report.Conclusion)}</div>");
         builder.AppendLine($"<div class=\"box\"><strong>问题总数</strong><br>{report.Issues.Count}</div>");
         builder.AppendLine("</div>");
+        WriteIssueSummaries(report, builder);
         WriteCoverage(report, builder);
         builder.AppendLine("<h2>问题列表</h2>");
         builder.AppendLine("<table><thead><tr><th>编号</th><th>级别</th><th>类型</th><th>位置</th><th>问题</th><th>模板要求</th><th>实际情况</th><th>修改建议</th></tr></thead><tbody>");
@@ -56,6 +57,44 @@ public sealed class ReportRenderService
         builder.AppendLine("</tbody></table>");
         builder.AppendLine("</body></html>");
         return builder.ToString();
+    }
+
+    private static void WriteIssueSummaries(AnalysisReport report, StringBuilder builder)
+    {
+        if (report.AreaSummaries.Count == 0 &&
+            report.CategorySummaries.Count == 0 &&
+            report.SeveritySummaries.Count == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine("<h2>问题统计</h2>");
+        builder.AppendLine("<div class=\"summary columns\">");
+        WriteSummaryBox(builder, "按区域统计", report.AreaSummaries);
+        WriteSummaryBox(builder, "按问题类型统计", report.CategorySummaries);
+        WriteSummaryBox(builder, "按严重程度统计", report.SeveritySummaries);
+        builder.AppendLine("</div>");
+    }
+
+    private static void WriteSummaryBox(StringBuilder builder, string title, IReadOnlyList<IssueSummary> summaries)
+    {
+        builder.AppendLine("<div class=\"box\"><strong>" + Encode(title) + "</strong>");
+        if (summaries.Count == 0)
+        {
+            builder.AppendLine("<p class=\"muted\">无</p>");
+        }
+        else
+        {
+            builder.AppendLine("<ul>");
+            foreach (var summary in summaries)
+            {
+                builder.AppendLine($"<li>{Encode(summary.Name)}：{summary.Count}</li>");
+            }
+
+            builder.AppendLine("</ul>");
+        }
+
+        builder.AppendLine("</div>");
     }
 
     private static void WriteCoverage(AnalysisReport report, StringBuilder builder)
