@@ -1,18 +1,52 @@
 
-# Beads / Dolt files (added by bd init)
+# Beads / Dolt local files
 .dolt/
-*.db
 .beads-credential-key
 
 # .NET
 bin/
 obj/
+out/
+publish/
+TestResults/
+*.user
+*.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
 
 # App runtime data
 App_Data/
 Generated/
 Uploads/
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
 
 # Local editor files
 .vs/
-*.user
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.cache
+~$*
+
+# Local secrets / environment overrides
+.env
+.env.*
+appsettings.Local.json
+secrets.json
+
+# Generated Word/report artifacts
+*.docx.tmp
+*-格式检查批注.docx
+*-格式检测报告.html
+*-正常文档.docx
