@@ -51,6 +51,10 @@ public sealed class ParagraphSnapshot
     public string TargetElementId { get; set; } = "";
     public int Index { get; set; }
     public string Text { get; set; } = "";
+    public string Area { get; set; } = "正文";
+    public string BlockType { get; set; } = "正文";
+    public int BlockIndex { get; set; }
+    public string BlockKey { get; set; } = "";
     public string StyleId { get; set; } = "";
     public string Justification { get; set; } = "";
     public string JustificationRaw { get; set; } = "";
@@ -69,6 +73,7 @@ public sealed class ParagraphSnapshot
     public string FirstLineIndentRaw { get; set; } = "";
     public int CharacterCount { get; set; }
     public int RunCount { get; set; }
+    public bool HasDrawing { get; set; }
     public List<RunFormatSnapshot> Runs { get; set; } = [];
     public bool IsEmpty => string.IsNullOrWhiteSpace(Text);
 }

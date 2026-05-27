@@ -47,12 +47,14 @@ public sealed class WordComparisonService
     {
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
-            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontName, baseline.CommonFontName);
-            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontSize, baseline.CommonFontSize);
-            var expectedJustification = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.Justification, baseline.CommonJustification);
-            var expectedSpacingBefore = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.SpacingBefore, baseline.CommonSpacingBefore);
-            var expectedSpacingAfter = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.SpacingAfter, baseline.CommonSpacingAfter);
-            var expectedLineSpacing = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.LineSpacing, baseline.CommonLineSpacing);
+            AddUnmatchedBlockIssueIfNeeded(issues, templateParagraphs, paragraph);
+
+            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontName, baseline.CommonFontName);
+            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontSize, baseline.CommonFontSize);
+            var expectedJustification = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.Justification, baseline.CommonJustification);
+            var expectedSpacingBefore = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.SpacingBefore, baseline.CommonSpacingBefore);
+            var expectedSpacingAfter = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.SpacingAfter, baseline.CommonSpacingAfter);
+            var expectedLineSpacing = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.LineSpacing, baseline.CommonLineSpacing);
 
             AddIfDifferent(issues, "F", "错误", "字体字号", paragraph, "字体不符合模板",
                 expectedFontName, paragraph.FontName, $"选中第 {paragraph.Index} 段文字，将字体改为 {expectedFontName}。");
@@ -74,6 +76,33 @@ public sealed class WordComparisonService
         }
     }
 
+    private void AddUnmatchedBlockIssueIfNeeded(
+        List<FormatIssue> issues,
+        IReadOnlyList<ParagraphSnapshot> templateParagraphs,
+        ParagraphSnapshot paragraph)
+    {
+        if (paragraph.Area == "正文" || FindTemplateParagraph(templateParagraphs, paragraph) is not null)
+        {
+            return;
+        }
+
+        issues.Add(new FormatIssue
+        {
+            IssueCode = NextCode("I"),
+            Severity = "提醒",
+            Category = "块匹配",
+            Location = LocationText(paragraph),
+            TargetElementId = paragraph.TargetElementId,
+            Area = paragraph.Area,
+            Title = "未找到对应模板块",
+            Expected = "应匹配同类型模板块后再判断格式",
+            Actual = $"当前识别为{paragraph.BlockType}",
+            Suggestion = "请确认该封面块是否属于模板要求；系统不会用正文全文规则判断该块。",
+            RequiresConfirmation = true,
+            IsUnchecked = true
+        });
+    }
+
     private void AddRunIssues(
         List<FormatIssue> issues,
         IReadOnlyList<ParagraphSnapshot> templateParagraphs,
@@ -87,8 +116,8 @@ public sealed class WordComparisonService
 
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
-            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontName, baseline.CommonFontName);
-            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontSize, baseline.CommonFontSize);
+            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontName, baseline.CommonFontName);
+            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontSize, baseline.CommonFontSize);
 
             var mismatchedFonts = paragraph.Runs
                 .Where(run => !string.IsNullOrWhiteSpace(expectedFontName) && !string.IsNullOrWhiteSpace(run.FontName) && run.FontName != expectedFontName)
@@ -104,9 +133,9 @@ public sealed class WordComparisonService
                     IssueCode = NextCode("F"),
                     Severity = "错误",
                     Category = "字体字号",
-                    Location = $"第 {paragraph.Index} 段",
+                    Location = LocationText(paragraph),
                     TargetElementId = paragraph.TargetElementId,
-                    Area = "正文",
+                    Area = paragraph.Area,
                     Title = "段内部分文字字体不符合模板",
                     Expected = expectedFontName,
                     Actual = string.Join("、", mismatchedFonts),
@@ -128,9 +157,9 @@ public sealed class WordComparisonService
                     IssueCode = NextCode("F"),
                     Severity = "错误",
                     Category = "字体字号",
-                    Location = $"第 {paragraph.Index} 段",
+                    Location = LocationText(paragraph),
                     TargetElementId = paragraph.TargetElementId,
-                    Area = "正文",
+                    Area = paragraph.Area,
                     Title = "段内部分文字字号不符合模板",
                     Expected = expectedFontSize,
                     Actual = string.Join("、", mismatchedSizes),
@@ -290,9 +319,9 @@ public sealed class WordComparisonService
             IssueCode = NextCode(prefix),
             Severity = severity,
             Category = category,
-            Location = $"第 {paragraph.Index} 段",
+            Location = LocationText(paragraph),
             TargetElementId = paragraph.TargetElementId,
-            Area = "正文",
+            Area = paragraph.Area,
             Title = title,
             Expected = expected,
             Actual = string.IsNullOrWhiteSpace(actual) ? "未识别" : actual,
@@ -310,13 +339,11 @@ public sealed class WordComparisonService
 
     private static string ExpectedParagraphValue(
         IReadOnlyList<ParagraphSnapshot> templateParagraphs,
-        int paragraphIndex,
+        ParagraphSnapshot targetParagraph,
         Func<ParagraphSnapshot, string> selector,
         string fallback)
     {
-        var templateParagraph = paragraphIndex > 0 && paragraphIndex <= templateParagraphs.Count
-            ? templateParagraphs[paragraphIndex - 1]
-            : null;
+        var templateParagraph = FindTemplateParagraph(templateParagraphs, targetParagraph);
 
         if (templateParagraph is not null && !templateParagraph.IsEmpty)
         {
@@ -327,6 +354,48 @@ public sealed class WordComparisonService
             }
         }
 
-        return fallback;
+        return targetParagraph.Area == "正文" ? fallback : "";
+    }
+
+    private static ParagraphSnapshot? FindTemplateParagraph(IReadOnlyList<ParagraphSnapshot> templateParagraphs, ParagraphSnapshot targetParagraph)
+    {
+        if (!string.IsNullOrWhiteSpace(targetParagraph.BlockKey))
+        {
+            var byBlockKey = templateParagraphs.FirstOrDefault(template =>
+                !template.IsEmpty &&
+                template.BlockKey == targetParagraph.BlockKey);
+
+            if (byBlockKey is not null)
+            {
+                return byBlockKey;
+            }
+        }
+
+        var byBlock = templateParagraphs.FirstOrDefault(template =>
+            !template.IsEmpty &&
+            template.Area == targetParagraph.Area &&
+            template.BlockType == targetParagraph.BlockType &&
+            template.BlockIndex == targetParagraph.BlockIndex);
+
+        if (byBlock is not null)
+        {
+            return byBlock;
+        }
+
+        if (targetParagraph.Area == "正文" &&
+            targetParagraph.Index > 0 &&
+            targetParagraph.Index <= templateParagraphs.Count)
+        {
+            return templateParagraphs[targetParagraph.Index - 1];
+        }
+
+        return null;
+    }
+
+    private static string LocationText(ParagraphSnapshot paragraph)
+    {
+        return paragraph.Area == "正文"
+            ? $"第 {paragraph.Index} 段"
+            : $"{paragraph.Area} / {paragraph.BlockType}（第 {paragraph.Index} 段）";
     }
 }

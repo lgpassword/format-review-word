@@ -94,11 +94,107 @@ public sealed class WordAnalysisService
                 FirstLineIndent = paragraphFormat.FirstLineIndent,
                 CharacterCount = paragraph.InnerText?.Length ?? 0,
                 RunCount = runs.Count,
+                HasDrawing = paragraph.Descendants<Drawing>().Any(),
                 Runs = runs
             });
         }
 
+        AssignDocumentBlocks(result);
         return result;
+    }
+
+    private static void AssignDocumentBlocks(IReadOnlyList<ParagraphSnapshot> paragraphs)
+    {
+        var firstBodyIndex = FindFirstBodyParagraphIndex(paragraphs);
+        var counters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var paragraph in paragraphs)
+        {
+            var isCover = paragraph.Index <= firstBodyIndex;
+            paragraph.Area = isCover ? "封面" : "正文";
+            paragraph.BlockType = isCover ? ClassifyCoverBlock(paragraph) : "正文段落";
+            paragraph.BlockIndex = NextBlockIndex(counters, paragraph.Area, paragraph.BlockType);
+            paragraph.BlockKey = $"{paragraph.Area}:{paragraph.BlockType}:{paragraph.BlockIndex}";
+        }
+    }
+
+    private static int FindFirstBodyParagraphIndex(IReadOnlyList<ParagraphSnapshot> paragraphs)
+    {
+        var bodyStart = paragraphs.FirstOrDefault(paragraph =>
+            !paragraph.IsEmpty &&
+            (paragraph.Text.Contains("摘", StringComparison.Ordinal) && paragraph.Text.Contains("要", StringComparison.Ordinal) ||
+             paragraph.Text.Contains("独创性声明", StringComparison.Ordinal) ||
+             paragraph.Text.Contains("目录", StringComparison.Ordinal) ||
+             paragraph.Text.StartsWith("第1章", StringComparison.Ordinal) ||
+             paragraph.Text.StartsWith("第一章", StringComparison.Ordinal)));
+
+        if (bodyStart is not null)
+        {
+            return Math.Max(1, bodyStart.Index - 1);
+        }
+
+        var firstLongParagraph = paragraphs.FirstOrDefault(paragraph => paragraph.CharacterCount >= 80);
+        return firstLongParagraph is null ? Math.Min(paragraphs.Count, 20) : Math.Max(1, firstLongParagraph.Index - 1);
+    }
+
+    private static string ClassifyCoverBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.HasDrawing)
+        {
+            return "封面图片";
+        }
+
+        if (paragraph.IsEmpty)
+        {
+            return "封面空行";
+        }
+
+        if (paragraph.Text.Contains("工程学院", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("大学", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("学院", StringComparison.Ordinal))
+        {
+            return "封面主标题";
+        }
+
+        if (paragraph.Text.Contains("毕业设计", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("毕业论文", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("学位论文", StringComparison.Ordinal))
+        {
+            return "封面副标题";
+        }
+
+        if (paragraph.Text.Contains("Design", StringComparison.OrdinalIgnoreCase) ||
+            paragraph.Text.Contains("Implementation", StringComparison.OrdinalIgnoreCase))
+        {
+            return "封面英文题名";
+        }
+
+        if (paragraph.Text.Contains("题目", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("姓名", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("学号", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("专业", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("班级", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("指导教师", StringComparison.Ordinal) ||
+            paragraph.Text.Contains("导师", StringComparison.Ordinal))
+        {
+            return "封面作者信息";
+        }
+
+        return paragraph.FontSize switch
+        {
+            "小初" or "初号" => "封面主标题",
+            "小二" or "二号" or "小一" => "封面题名",
+            _ => "封面其他文字"
+        };
+    }
+
+    private static int NextBlockIndex(IDictionary<string, int> counters, string area, string blockType)
+    {
+        var key = $"{area}:{blockType}";
+        counters.TryGetValue(key, out var value);
+        value++;
+        counters[key] = value;
+        return value;
     }
 
     private List<RunFormatSnapshot> ExtractRuns(Paragraph paragraph, MainDocumentPart mainPart)
