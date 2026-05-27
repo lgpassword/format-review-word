@@ -70,7 +70,7 @@ public sealed class WordTerminologyService
 
     public string Justification(string rawValue)
     {
-        return rawValue.Trim().ToLowerInvariant() switch
+        return NormalizeOpenXmlValue(rawValue) switch
         {
             "left" or "start" => "左对齐",
             "center" => "居中对齐",
@@ -80,6 +80,11 @@ public sealed class WordTerminologyService
             "" => "",
             _ => rawValue
         };
+    }
+
+    public string JustificationRaw(string rawValue)
+    {
+        return NormalizeOpenXmlValue(rawValue);
     }
 
     public string Spacing(string rawTwips)
@@ -129,12 +134,27 @@ public sealed class WordTerminologyService
 
     public string PageOrientation(string rawValue)
     {
-        return rawValue.Trim().ToLowerInvariant() switch
+        return NormalizeOpenXmlValue(rawValue) switch
         {
             "portrait" => "纵向",
             "landscape" => "横向",
             "" => "",
             _ => rawValue
         };
+    }
+
+    private static string NormalizeOpenXmlValue(string rawValue)
+    {
+        var trimmed = rawValue.Trim();
+        if (trimmed.Length == 0)
+        {
+            return "";
+        }
+
+        var lower = trimmed.ToLowerInvariant();
+        return lower.Contains("justificationvalues", StringComparison.OrdinalIgnoreCase) ||
+               lower.Contains("pageorientationvalues", StringComparison.OrdinalIgnoreCase)
+            ? ""
+            : lower;
     }
 }

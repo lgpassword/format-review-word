@@ -19,9 +19,10 @@ public sealed class WordStyleResolver
         var defaults = mainPart.StyleDefinitionsPart?.Styles?.DocDefaults?.ParagraphPropertiesDefault?.ParagraphPropertiesBaseStyle;
 
         var rawJustification = FirstNonEmpty(
-            direct?.Justification?.Val?.Value.ToString(),
-            style?.StyleParagraphProperties?.Justification?.Val?.Value.ToString(),
-            defaults?.Justification?.Val?.Value.ToString());
+            direct?.Justification?.Val?.InnerText,
+            style?.StyleParagraphProperties?.Justification?.Val?.InnerText,
+            defaults?.Justification?.Val?.InnerText);
+        rawJustification = _terminology.JustificationRaw(rawJustification);
 
         var rawBefore = FirstNonEmpty(
             direct?.SpacingBetweenLines?.Before?.Value,
