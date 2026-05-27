@@ -51,7 +51,10 @@ public sealed class WordComparisonService
     {
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
-            AddUnmatchedBlockIssueIfNeeded(issues, templateParagraphs, paragraph);
+            if (rules.Count == 0)
+            {
+                AddUnmatchedBlockIssueIfNeeded(issues, templateParagraphs, paragraph);
+            }
 
             var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.ChineseFontName, r => r.ChineseFontName, baseline.CommonChineseFontName);
             var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.WesternFontName, r => r.WesternFontName, baseline.CommonWesternFontName);
@@ -130,14 +133,15 @@ public sealed class WordComparisonService
     {
         if (string.IsNullOrWhiteSpace(baseline.CommonChineseFontName) &&
             string.IsNullOrWhiteSpace(baseline.CommonWesternFontName) &&
-            string.IsNullOrWhiteSpace(baseline.CommonFontSize))
+            string.IsNullOrWhiteSpace(baseline.CommonFontSize) &&
+            !rules.Any(HasRunFormatRule))
         {
             return;
         }
 
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
-            var templateParagraph = FindTemplateParagraph(templateParagraphs, paragraph);
+            var templateParagraph = rules.Count == 0 ? FindTemplateParagraph(templateParagraphs, paragraph) : null;
             var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.ChineseFontName, r => r.ChineseFontName, baseline.CommonChineseFontName);
             var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.WesternFontName, r => r.WesternFontName, baseline.CommonWesternFontName);
             var expectedFontSize = ExpectedParagraphValue(templateParagraphs, rules, paragraph, p => p.FontSize, r => r.FontSize, baseline.CommonFontSize);
@@ -428,6 +432,13 @@ public sealed class WordComparisonService
         return rules.FirstOrDefault(rule =>
             string.Equals(rule.Area, paragraph.Area, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(rule.BlockType, paragraph.BlockType, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasRunFormatRule(TemplateFormatRule rule)
+    {
+        return !string.IsNullOrWhiteSpace(rule.ChineseFontName) ||
+               !string.IsNullOrWhiteSpace(rule.WesternFontName) ||
+               !string.IsNullOrWhiteSpace(rule.FontSize);
     }
 
     private static ParagraphSnapshot? FindTemplateParagraph(IReadOnlyList<ParagraphSnapshot> templateParagraphs, ParagraphSnapshot targetParagraph)

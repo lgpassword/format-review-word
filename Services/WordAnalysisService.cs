@@ -343,12 +343,37 @@ public sealed class WordAnalysisService
         }
 
         var text = NormalizeText(paragraph.Text);
-        if (IsBodyHeading(text))
+        if (IsFigureCaption(text))
         {
-            return "正文标题";
+            return "图题";
         }
 
-        return "正文段落";
+        if (IsTableCaption(text))
+        {
+            return "表题";
+        }
+
+        if (IsListParagraph(text))
+        {
+            return "正文列表段落";
+        }
+
+        if (IsBodyHeading(text))
+        {
+            return BodyHeadingLevel(text);
+        }
+
+        if (paragraph.Text.Any(IsAsciiLetter) && !paragraph.Text.Any(IsCjkCharacter))
+        {
+            return "正文英文段落";
+        }
+
+        if (paragraph.Text.Any(IsAsciiLetter) && paragraph.Text.Any(IsCjkCharacter))
+        {
+            return "正文中英文混排段落";
+        }
+
+        return "正文普通段落";
     }
 
     private static string NormalizeText(string value)
@@ -429,6 +454,55 @@ public sealed class WordAnalysisService
         return text[..dotIndex].All(char.IsDigit) &&
                char.IsDigit(text[0]) &&
                text[(dotIndex + 1)..].Any(IsCjkCharacter);
+    }
+
+    private static string BodyHeadingLevel(string text)
+    {
+        if (IsChapterHeading(text))
+        {
+            return "正文章标题";
+        }
+
+        var dotParts = text.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (dotParts.Length >= 3 && dotParts.Take(3).All(part => part.All(char.IsDigit)))
+        {
+            return "正文三级标题";
+        }
+
+        if (dotParts.Length >= 2 && dotParts.Take(2).All(part => part.All(char.IsDigit)))
+        {
+            return "正文二级标题";
+        }
+
+        return "正文一级标题";
+    }
+
+    private static bool IsFigureCaption(string text)
+    {
+        return text.Length > 2 &&
+               (text.StartsWith("图", StringComparison.Ordinal) || text.StartsWith("Fig", StringComparison.OrdinalIgnoreCase)) &&
+               text.Skip(1).Any(char.IsDigit);
+    }
+
+    private static bool IsTableCaption(string text)
+    {
+        return text.Length > 2 &&
+               (text.StartsWith("表", StringComparison.Ordinal) || text.StartsWith("Table", StringComparison.OrdinalIgnoreCase)) &&
+               text.Skip(1).Any(char.IsDigit);
+    }
+
+    private static bool IsListParagraph(string text)
+    {
+        return text.StartsWith("（", StringComparison.Ordinal) ||
+               text.StartsWith("(", StringComparison.Ordinal) ||
+               text.StartsWith("①", StringComparison.Ordinal) ||
+               text.StartsWith("②", StringComparison.Ordinal) ||
+               text.StartsWith("③", StringComparison.Ordinal) ||
+               text.StartsWith("④", StringComparison.Ordinal) ||
+               text.StartsWith("⑤", StringComparison.Ordinal) ||
+               text.StartsWith("1）", StringComparison.Ordinal) ||
+               text.StartsWith("1)", StringComparison.Ordinal) ||
+               text.StartsWith("1、", StringComparison.Ordinal);
     }
 
     private static bool IsAsciiLetter(char character)

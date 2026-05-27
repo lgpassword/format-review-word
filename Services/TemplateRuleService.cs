@@ -92,7 +92,9 @@ public sealed class TemplateRuleService
             LineSpacing = source.LineSpacing,
             LineSpacingRaw = source.LineSpacingRaw,
             FirstLineIndent = source.FirstLineIndent,
-            FirstLineIndentRaw = source.FirstLineIndentRaw
+            FirstLineIndentRaw = source.FirstLineIndentRaw,
+            ParagraphCount = source.ParagraphCount,
+            SampleText = source.SampleText
         };
     }
 
@@ -125,8 +127,38 @@ public sealed class TemplateRuleService
             LineSpacing = MostCommon(nonEmpty.Select(paragraph => paragraph.LineSpacing)),
             LineSpacingRaw = MostCommon(nonEmpty.Select(paragraph => paragraph.LineSpacingRaw)),
             FirstLineIndent = MostCommon(nonEmpty.Select(paragraph => paragraph.FirstLineIndent)),
-            FirstLineIndentRaw = MostCommon(nonEmpty.Select(paragraph => paragraph.FirstLineIndentRaw))
+            FirstLineIndentRaw = MostCommon(nonEmpty.Select(paragraph => paragraph.FirstLineIndentRaw)),
+            ParagraphCount = nonEmpty.Count,
+            SampleText = Limit(nonEmpty.Select(paragraph => paragraph.Text).FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? "", 60)
         };
+    }
+
+    public List<TemplateFormatRule> BuildEmptyRules(DocumentAnalysisResult analysis, string source)
+    {
+        return BuildRules(analysis, source)
+            .Select(rule =>
+            {
+                var empty = Clone(rule);
+                empty.Source = source;
+                empty.ChineseFontName = "";
+                empty.ChineseFontNameRaw = "";
+                empty.WesternFontName = "";
+                empty.WesternFontNameRaw = "";
+                empty.FontSize = "";
+                empty.FontSizeRaw = "";
+                empty.Justification = "";
+                empty.JustificationRaw = "";
+                empty.SpacingBefore = "";
+                empty.SpacingBeforeRaw = "";
+                empty.SpacingAfter = "";
+                empty.SpacingAfterRaw = "";
+                empty.LineSpacing = "";
+                empty.LineSpacingRaw = "";
+                empty.FirstLineIndent = "";
+                empty.FirstLineIndentRaw = "";
+                return empty;
+            })
+            .ToList();
     }
 
     private void ApplyEdit(TemplateFormatRule rule, TemplateRuleEditInput edit)
@@ -262,6 +294,12 @@ public sealed class TemplateRuleService
             "致谢" => 8,
             _ => 99
         };
+    }
+
+    private static string Limit(string value, int maxLength)
+    {
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength] + "...";
     }
 }
 

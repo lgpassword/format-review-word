@@ -37,6 +37,8 @@ public sealed class TemplateFormatRule
     public string LineSpacingRaw { get; set; } = "";
     public string FirstLineIndent { get; set; } = "";
     public string FirstLineIndentRaw { get; set; } = "";
+    public int ParagraphCount { get; set; }
+    public string SampleText { get; set; } = "";
 }
 
 public sealed class IssueSummary

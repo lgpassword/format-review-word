@@ -58,6 +58,9 @@ public class IndexModel : PageModel
     [BindProperty]
     public IFormFile? ReferenceTemplateFile { get; set; }
 
+    [BindProperty]
+    public IFormFile? CustomRuleFile { get; set; }
+
     [BindProperty(SupportsGet = true)]
     public string? SessionId { get; set; }
 
@@ -123,6 +126,88 @@ public class IndexModel : PageModel
         };
 
         await _sessions.SaveTemplateAsync(session);
+        return RedirectToPage(new { sessionId = session.Id });
+    }
+
+    public async Task<IActionResult> OnPostCustomRuleFileAsync()
+    {
+        var validation = ValidateWordFile(CustomRuleFile);
+        if (validation is not null)
+        {
+            ModelState.AddModelError(string.Empty, validation);
+            return Page();
+        }
+
+        if (Path.GetExtension(CustomRuleFile!.FileName).Equals(".doc", StringComparison.OrdinalIgnoreCase) && !IsWindows)
+        {
+            ModelState.AddModelError(string.Empty, "当前环境不支持 .doc 转换，请在 Windows 且安装 Microsoft Word 的环境中使用 .doc。");
+            return Page();
+        }
+
+        var path = _storage.CreateUploadPath(CustomRuleFile!.FileName);
+        await SaveUploadAsync(CustomRuleFile, path);
+        var analysisPath = await _converter.EnsureDocxAsync(path, CustomRuleFile.FileName);
+        var analysis = _analysis.Analyze(analysisPath, CustomRuleFile.FileName);
+
+        var session = new AnalysisSession
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            CreatedAt = DateTime.Now,
+            TemplateFileName = "用户自定义规则",
+            TemplatePath = analysisPath,
+            TemplateAnalysis = analysis,
+            EffectiveRules = _templateRules.BuildEmptyRules(analysis, "用户填写"),
+            TargetFileName = CustomRuleFile.FileName,
+            TargetPath = path
+        };
+
+        await _sessions.SaveTemplateAsync(session);
+        return RedirectToPage(new { sessionId = session.Id });
+    }
+
+    public async Task<IActionResult> OnPostRunCustomRulesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SessionId))
+        {
+            ModelState.AddModelError(string.Empty, "请先上传需要设置规则的文档。");
+            return Page();
+        }
+
+        var session = await _sessions.GetAsync(SessionId);
+        if (session is null)
+        {
+            ModelState.AddModelError(string.Empty, "文档分析会话不存在，请重新上传。");
+            return Page();
+        }
+
+        var currentRules = session.EffectiveRules.Count > 0
+            ? session.EffectiveRules
+            : _templateRules.BuildEmptyRules(session.TemplateAnalysis, "用户填写");
+        session.EffectiveRules = _templateRules.ApplyEdits(currentRules, RuleEdits);
+
+        var targetPath = session.TargetPath ?? session.TemplatePath;
+        var targetAnalysisPath = await _converter.EnsureDocxAsync(targetPath, session.TargetFileName ?? session.TemplateFileName);
+        var targetAnalysis = _analysis.Analyze(targetAnalysisPath, session.TargetFileName ?? session.TemplateFileName);
+        var ruleDocument = BuildCustomRuleDocument(session, targetAnalysis);
+        var report = _comparison.Compare(ruleDocument, targetAnalysis);
+
+        var outputBaseName = Path.GetFileNameWithoutExtension(session.TargetFileName ?? session.TemplateFileName);
+        var annotatedPath = _storage.CreateGeneratedPath($"{outputBaseName}-自定义规则批注.docx");
+        _annotation.CreateAnnotatedCopy(targetAnalysisPath, annotatedPath, report.Issues);
+        report.AnnotatedWordDownloadName = Path.GetFileName(annotatedPath);
+
+        var htmlPath = _storage.CreateGeneratedPath($"{outputBaseName}-自定义规则检测报告.html");
+        _reports.WriteHtmlReport(report, htmlPath);
+        report.HtmlReportDownloadName = Path.GetFileName(htmlPath);
+
+        var normalPath = _storage.CreateGeneratedPath($"{outputBaseName}-按自定义规则调整.docx");
+        _normalDocument.CreateNormalizedCopy(targetAnalysisPath, normalPath, ruleDocument, report.Issues);
+        report.NormalDocumentDownloadName = Path.GetFileName(normalPath);
+
+        session.Report = report;
+        session.AnnotatedPath = annotatedPath;
+        session.HtmlReportPath = htmlPath;
+        await _sessions.UpdateReportAsync(session);
         return RedirectToPage(new { sessionId = session.Id });
     }
 
@@ -333,6 +418,21 @@ public class IndexModel : PageModel
         }
 
         VisibleIssues = ApplyFilters(Session?.Report?.Issues ?? []);
+    }
+
+    private static DocumentAnalysisResult BuildCustomRuleDocument(AnalysisSession session, DocumentAnalysisResult targetAnalysis)
+    {
+        return new DocumentAnalysisResult
+        {
+            FileName = "用户填写的模块规则",
+            Paragraphs = [],
+            Tables = targetAnalysis.Tables,
+            PageSetup = targetAnalysis.PageSetup,
+            Baseline = new TemplateBaseline { PageSetup = targetAnalysis.PageSetup },
+            FormatRules = session.EffectiveRules.Select(TemplateRuleService.Clone).ToList(),
+            CoverageAreas = targetAnalysis.CoverageAreas,
+            UncheckedItems = targetAnalysis.UncheckedItems
+        };
     }
 
     private IReadOnlyList<FormatIssue> ApplyFilters(IReadOnlyList<FormatIssue> issues)

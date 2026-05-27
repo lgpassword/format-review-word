@@ -5,11 +5,12 @@
     var report = Model.Session?.Report;
     var severities = report?.Issues.Select(i => i.Severity).Distinct().ToList() ?? [];
     var categories = report?.Issues.Select(i => i.Category).Distinct().ToList() ?? [];
+    var isCustomRuleSession = Model.Session?.TemplateFileName == "用户自定义规则";
 }
 
 <section class="page-title">
     <h1>Word 格式检查</h1>
-    <p>先上传模板并完成分析，再上传实际文档进行检查。</p>
+    <p>支持按模板检查，也支持先拆分文档模块后由用户填写检查要求。</p>
 </section>
 
 @if (!ViewData.ModelState.IsValid)
@@ -24,9 +25,9 @@
 
 <section class="panel">
     <div class="step-heading">
-        <span class="step-number">1</span>
+        <span class="step-number">A</span>
         <div>
-            <h2>上传模板文档</h2>
+            <h2>入口一：按模板检查</h2>
             <p>模板支持 .doc 和 .docx，程序会先读取批注和常见格式。</p>
         </div>
     </div>
@@ -36,12 +37,26 @@
     </form>
 </section>
 
+<section class="panel">
+    <div class="step-heading">
+        <span class="step-number">B</span>
+        <div>
+            <h2>入口二：用户自定义模块规则检查</h2>
+            <p>先上传需要检查的文档，系统拆分封面、目录、正文标题、正文段落、图题、表题等模块，再由用户填写各模块要求。</p>
+        </div>
+    </div>
+    <form method="post" enctype="multipart/form-data" asp-page-handler="CustomRuleFile" class="upload-form">
+        <input class="form-control" type="file" asp-for="CustomRuleFile" accept=".doc,.docx" />
+        <button class="btn btn-primary" type="submit">拆分模块并设置规则</button>
+    </form>
+</section>
+
 @if (Model.Session is not null)
 {
     <section class="panel">
-        <h2>模板分析摘要</h2>
+        <h2>@(isCustomRuleSession ? "文档模块拆分摘要" : "模板分析摘要")</h2>
         <dl class="summary-grid">
-            <div><dt>模板文件</dt><dd>@Model.Session.TemplateFileName</dd></div>
+            <div><dt>@(isCustomRuleSession ? "待检查文档" : "模板文件")</dt><dd>@(isCustomRuleSession ? Model.Session.TargetFileName : Model.Session.TemplateFileName)</dd></div>
             <div><dt>批注数量</dt><dd>@Model.Session.TemplateAnalysis.Comments.Count</dd></div>
             <div><dt>段落数量</dt><dd>@Model.Session.TemplateAnalysis.Paragraphs.Count</dd></div>
             <div><dt>表格数量</dt><dd>@Model.Session.TemplateAnalysis.Tables.Count</dd></div>
@@ -50,26 +65,29 @@
             <div><dt>常见字号</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonFontSize.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonFontSize)</dd></div>
         </dl>
 
-        <form method="post" enctype="multipart/form-data" asp-page-handler="ReferenceTemplate" class="upload-form">
-            <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
-            <input class="form-control" type="file" asp-for="ReferenceTemplateFile" accept=".doc,.docx" />
-            <button class="btn btn-outline-primary" type="submit">上传合格参考模板</button>
-        </form>
-
-        @if (Model.Session.ReferenceTemplates.Count > 0)
+        @if (!isCustomRuleSession)
         {
-            <details open>
-                <summary>已上传合格参考模板：@Model.Session.ReferenceTemplates.Count 个</summary>
-                <ul class="comment-list">
-                    @foreach (var reference in Model.Session.ReferenceTemplates)
-                    {
-                        <li>@reference.FileName</li>
-                    }
-                </ul>
-            </details>
+            <form method="post" enctype="multipart/form-data" asp-page-handler="ReferenceTemplate" class="upload-form">
+                <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
+                <input class="form-control" type="file" asp-for="ReferenceTemplateFile" accept=".doc,.docx" />
+                <button class="btn btn-outline-primary" type="submit">上传合格参考模板</button>
+            </form>
+
+            @if (Model.Session.ReferenceTemplates.Count > 0)
+            {
+                <details open>
+                    <summary>已上传合格参考模板：@Model.Session.ReferenceTemplates.Count 个</summary>
+                    <ul class="comment-list">
+                        @foreach (var reference in Model.Session.ReferenceTemplates)
+                        {
+                            <li>@reference.FileName</li>
+                        }
+                    </ul>
+                </details>
+            }
         }
 
-        @if (Model.Session.RuleConflicts.Count > 0)
+        @if (!isCustomRuleSession && Model.Session.RuleConflicts.Count > 0)
         {
             <section class="panel">
                 <h3>模板规则冲突</h3>
@@ -157,14 +175,15 @@
         @if (Model.Session.EffectiveRules.Count > 0)
         {
             <details open>
-                <summary>查看和编辑本次采用的格式规则：@Model.Session.EffectiveRules.Count 条</summary>
-                <form method="post" asp-page-handler="SaveRules">
+                <summary>@(isCustomRuleSession ? "按模块填写检查要求" : "查看和编辑本次采用的格式规则")：@Model.Session.EffectiveRules.Count 条</summary>
+                <form method="post" asp-page-handler="@(isCustomRuleSession ? "RunCustomRules" : "SaveRules")">
                     <input type="hidden" asp-for="SessionId" value="@Model.Session.Id" />
                     <div class="table-responsive">
-                        <table class="table table-sm issue-table">
+                        <table class="table table-sm issue-table rule-table">
                             <thead>
                             <tr>
                                 <th>区域/块</th>
+                                <th>覆盖内容</th>
                                 <th>中文字体</th>
                                 <th>西文字体</th>
                                 <th>字号</th>
@@ -184,6 +203,10 @@
                                         <strong>@rule.Area</strong><br />
                                         <span class="muted">@rule.BlockType</span>
                                     </td>
+                                    <td>
+                                        <strong>@rule.ParagraphCount 段</strong><br />
+                                        <span class="muted">@rule.SampleText</span>
+                                    </td>
                                     <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].ChineseFontName" value="@rule.ChineseFontName" /></td>
                                     <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].WesternFontName" value="@rule.WesternFontName" /></td>
                                     <td><input class="form-control form-control-sm" name="RuleEdits[@rule.RuleId].FontSize" value="@rule.FontSize" /></td>
@@ -198,7 +221,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <button class="btn btn-warning" type="submit">保存本次规则</button>
+                    <button class="btn btn-warning" type="submit">@(isCustomRuleSession ? "按填写规则开始检查" : "保存本次规则")</button>
                 </form>
             </details>
         }
@@ -217,7 +240,9 @@
         }
     </section>
 
-    <section class="panel">
+    @if (!isCustomRuleSession)
+    {
+        <section class="panel">
         <div class="step-heading">
             <span class="step-number">2</span>
             <div>
@@ -230,7 +255,8 @@
             <input class="form-control" type="file" asp-for="TargetFile" accept=".doc,.docx" />
             <button class="btn btn-success" type="submit">开始检测</button>
         </form>
-    </section>
+        </section>
+    }
 }
 
 @if (report is not null)
