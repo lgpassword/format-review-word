@@ -105,36 +105,78 @@ public sealed class WordAnalysisService
 
     private static void AssignDocumentBlocks(IReadOnlyList<ParagraphSnapshot> paragraphs)
     {
-        var firstBodyIndex = FindFirstBodyParagraphIndex(paragraphs);
         var counters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var currentArea = "封面";
 
         foreach (var paragraph in paragraphs)
         {
-            var isCover = paragraph.Index <= firstBodyIndex;
-            paragraph.Area = isCover ? "封面" : "正文";
-            paragraph.BlockType = isCover ? ClassifyCoverBlock(paragraph) : "正文段落";
+            if (!paragraph.IsEmpty)
+            {
+                currentArea = ResolveArea(currentArea, paragraph);
+            }
+
+            paragraph.Area = currentArea;
+            paragraph.BlockType = ClassifyBlock(paragraph);
             paragraph.BlockIndex = NextBlockIndex(counters, paragraph.Area, paragraph.BlockType);
             paragraph.BlockKey = $"{paragraph.Area}:{paragraph.BlockType}:{paragraph.BlockIndex}";
         }
     }
 
-    private static int FindFirstBodyParagraphIndex(IReadOnlyList<ParagraphSnapshot> paragraphs)
+    private static string ResolveArea(string currentArea, ParagraphSnapshot paragraph)
     {
-        var bodyStart = paragraphs.FirstOrDefault(paragraph =>
-            !paragraph.IsEmpty &&
-            (paragraph.Text.Contains("摘", StringComparison.Ordinal) && paragraph.Text.Contains("要", StringComparison.Ordinal) ||
-             paragraph.Text.Contains("独创性声明", StringComparison.Ordinal) ||
-             paragraph.Text.Contains("目录", StringComparison.Ordinal) ||
-             paragraph.Text.StartsWith("第1章", StringComparison.Ordinal) ||
-             paragraph.Text.StartsWith("第一章", StringComparison.Ordinal)));
+        var text = NormalizeText(paragraph.Text);
 
-        if (bodyStart is not null)
+        if (IsDeclarationHeading(text))
         {
-            return Math.Max(1, bodyStart.Index - 1);
+            return "声明";
         }
 
-        var firstLongParagraph = paragraphs.FirstOrDefault(paragraph => paragraph.CharacterCount >= 80);
-        return firstLongParagraph is null ? Math.Min(paragraphs.Count, 20) : Math.Max(1, firstLongParagraph.Index - 1);
+        if (IsAbstractHeading(text))
+        {
+            return "摘要";
+        }
+
+        if (IsTocHeading(text))
+        {
+            return "目录";
+        }
+
+        if (IsReferenceHeading(text))
+        {
+            return "参考文献";
+        }
+
+        if (IsAppendixHeading(text))
+        {
+            return "附录";
+        }
+
+        if (IsAcknowledgementHeading(text))
+        {
+            return "致谢";
+        }
+
+        if (IsBodyHeading(text))
+        {
+            return "正文";
+        }
+
+        return currentArea;
+    }
+
+    private static string ClassifyBlock(ParagraphSnapshot paragraph)
+    {
+        return paragraph.Area switch
+        {
+            "封面" => ClassifyCoverBlock(paragraph),
+            "目录" => ClassifyTocBlock(paragraph),
+            "摘要" => ClassifyAbstractBlock(paragraph),
+            "声明" => ClassifyDeclarationBlock(paragraph),
+            "参考文献" => ClassifyReferenceBlock(paragraph),
+            "附录" => ClassifyAppendixBlock(paragraph),
+            "致谢" => ClassifyAcknowledgementBlock(paragraph),
+            _ => ClassifyBodyBlock(paragraph)
+        };
     }
 
     private static string ClassifyCoverBlock(ParagraphSnapshot paragraph)
@@ -186,6 +228,167 @@ public sealed class WordAnalysisService
             "小二" or "二号" or "小一" => "封面题名",
             _ => "封面其他文字"
         };
+    }
+
+    private static string ClassifyTocBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.IsEmpty)
+        {
+            return "目录空行";
+        }
+
+        var text = NormalizeText(paragraph.Text);
+        if (IsTocHeading(text))
+        {
+            return "目录标题";
+        }
+
+        return paragraph.Text.Contains('.') || paragraph.Text.Contains('…') || paragraph.Text.Contains('\t')
+            ? "目录条目"
+            : "目录文本";
+    }
+
+    private static string ClassifyAbstractBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.IsEmpty)
+        {
+            return "摘要空行";
+        }
+
+        var text = NormalizeText(paragraph.Text);
+        if (IsAbstractHeading(text))
+        {
+            return text.Contains("英文", StringComparison.OrdinalIgnoreCase) || text.Contains("abstract", StringComparison.OrdinalIgnoreCase)
+                ? "英文摘要标题"
+                : "中文摘要标题";
+        }
+
+        if (text.StartsWith("关键词", StringComparison.Ordinal) || text.StartsWith("关键字", StringComparison.Ordinal) || text.StartsWith("keywords", StringComparison.OrdinalIgnoreCase))
+        {
+            return "摘要关键词";
+        }
+
+        return text.Any(IsAsciiLetter) && !text.Any(IsCjkCharacter)
+            ? "英文摘要正文"
+            : "中文摘要正文";
+    }
+
+    private static string ClassifyDeclarationBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.IsEmpty)
+        {
+            return "声明空行";
+        }
+
+        return IsDeclarationHeading(NormalizeText(paragraph.Text)) ? "声明标题" : "声明正文";
+    }
+
+    private static string ClassifyReferenceBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.IsEmpty)
+        {
+            return "参考文献空行";
+        }
+
+        return IsReferenceHeading(NormalizeText(paragraph.Text)) ? "参考文献标题" : "参考文献条目";
+    }
+
+    private static string ClassifyAppendixBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.IsEmpty)
+        {
+            return "附录空行";
+        }
+
+        return IsAppendixHeading(NormalizeText(paragraph.Text)) ? "附录标题" : "附录正文";
+    }
+
+    private static string ClassifyAcknowledgementBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.IsEmpty)
+        {
+            return "致谢空行";
+        }
+
+        return IsAcknowledgementHeading(NormalizeText(paragraph.Text)) ? "致谢标题" : "致谢正文";
+    }
+
+    private static string ClassifyBodyBlock(ParagraphSnapshot paragraph)
+    {
+        if (paragraph.IsEmpty)
+        {
+            return "正文空行";
+        }
+
+        var text = NormalizeText(paragraph.Text);
+        if (IsBodyHeading(text))
+        {
+            return "正文标题";
+        }
+
+        return "正文段落";
+    }
+
+    private static string NormalizeText(string value)
+    {
+        return new string(value.Where(character => !char.IsWhiteSpace(character)).ToArray()).Trim();
+    }
+
+    private static bool IsDeclarationHeading(string text)
+    {
+        return text.Contains("独创性声明", StringComparison.Ordinal) ||
+               text.Contains("授权声明", StringComparison.Ordinal) ||
+               text.Contains("原创性声明", StringComparison.Ordinal);
+    }
+
+    private static bool IsAbstractHeading(string text)
+    {
+        return text is "摘要" or "中文摘要" or "英文摘要" ||
+               text.Equals("Abstract", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTocHeading(string text)
+    {
+        return text is "目录" or "目次" ||
+               text.Equals("Contents", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsBodyHeading(string text)
+    {
+        return text.StartsWith("第1章", StringComparison.Ordinal) ||
+               text.StartsWith("第一章", StringComparison.Ordinal) ||
+               text.StartsWith("1.", StringComparison.Ordinal) ||
+               text.StartsWith("1、", StringComparison.Ordinal);
+    }
+
+    private static bool IsReferenceHeading(string text)
+    {
+        return text is "参考文献" or "文献" ||
+               text.Equals("References", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAppendixHeading(string text)
+    {
+        return text.StartsWith("附录", StringComparison.Ordinal) ||
+               text.Equals("Appendix", StringComparison.OrdinalIgnoreCase) ||
+               text.StartsWith("Appendix", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAcknowledgementHeading(string text)
+    {
+        return text is "致谢" or "谢辞" ||
+               text.Equals("Acknowledgements", StringComparison.OrdinalIgnoreCase) ||
+               text.Equals("Acknowledgments", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAsciiLetter(char character)
+    {
+        return character is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
+    }
+
+    private static bool IsCjkCharacter(char character)
+    {
+        return character is >= '\u4e00' and <= '\u9fff';
     }
 
     private static int NextBlockIndex(IDictionary<string, int> counters, string area, string blockType)
@@ -348,22 +551,35 @@ public sealed class WordAnalysisService
 
     private static List<CoverageAreaSummary> BuildCoverage(DocumentAnalysisResult result)
     {
-        var bodyParagraphs = result.Paragraphs;
         var objectCount = result.Tables.Count;
-        return
-        [
-            new CoverageAreaSummary
+        var summaries = result.Paragraphs
+            .GroupBy(paragraph => paragraph.Area)
+            .Select(group => new CoverageAreaSummary
             {
-                Area = "全文",
-                CharacterCount = bodyParagraphs.Sum(paragraph => paragraph.CharacterCount),
-                ParagraphCount = bodyParagraphs.Count,
-                ObjectCount = objectCount,
-                CheckedCharacterCount = bodyParagraphs.Sum(paragraph => paragraph.CharacterCount),
-                CheckedParagraphCount = bodyParagraphs.Count,
-                CheckedObjectCount = objectCount,
+                Area = group.Key,
+                CharacterCount = group.Sum(paragraph => paragraph.CharacterCount),
+                ParagraphCount = group.Count(),
+                ObjectCount = group.Count(paragraph => paragraph.HasDrawing),
+                CheckedCharacterCount = group.Sum(paragraph => paragraph.CharacterCount),
+                CheckedParagraphCount = group.Count(),
+                CheckedObjectCount = group.Count(paragraph => paragraph.HasDrawing),
                 Notes = objectCount == 0 ? [] : ["表格结构已检查，表格内文字按段落文本参与字体字号检查。"]
-            }
-        ];
+            })
+            .ToList();
+
+        summaries.Add(new CoverageAreaSummary
+        {
+            Area = "全文",
+            CharacterCount = result.Paragraphs.Sum(paragraph => paragraph.CharacterCount),
+            ParagraphCount = result.Paragraphs.Count,
+            ObjectCount = objectCount,
+            CheckedCharacterCount = result.Paragraphs.Sum(paragraph => paragraph.CharacterCount),
+            CheckedParagraphCount = result.Paragraphs.Count,
+            CheckedObjectCount = objectCount,
+            Notes = objectCount == 0 ? [] : ["表格结构已检查，表格内文字按段落文本参与字体字号检查。"]
+        });
+
+        return summaries;
     }
 
     private static List<UncheckedItem> BuildUncheckedItems(DocumentAnalysisResult result)

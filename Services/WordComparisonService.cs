@@ -97,7 +97,7 @@ public sealed class WordComparisonService
             Title = "未找到对应模板块",
             Expected = "应匹配同类型模板块后再判断格式",
             Actual = $"当前识别为{paragraph.BlockType}",
-            Suggestion = "请确认该封面块是否属于模板要求；系统不会用正文全文规则判断该块。",
+            Suggestion = "请确认该区域块是否属于模板要求；系统不会用正文全文规则判断非正文区域。",
             RequiresConfirmation = true,
             IsUnchecked = true
         });
@@ -116,12 +116,14 @@ public sealed class WordComparisonService
 
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
+            var templateParagraph = FindTemplateParagraph(templateParagraphs, paragraph);
             var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontName, baseline.CommonFontName);
             var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontSize, baseline.CommonFontSize);
 
             var mismatchedFonts = paragraph.Runs
-                .Where(run => !string.IsNullOrWhiteSpace(expectedFontName) && !string.IsNullOrWhiteSpace(run.FontName) && run.FontName != expectedFontName)
-                .Select(run => run.FontName)
+                .Select(run => (Run: run, Expected: ExpectedRunValue(templateParagraph, paragraph, run.Index, template => template.FontName, expectedFontName)))
+                .Where(item => !string.IsNullOrWhiteSpace(item.Expected) && !string.IsNullOrWhiteSpace(item.Run.FontName) && item.Run.FontName != item.Expected)
+                .Select(item => item.Run.FontName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(3)
                 .ToList();
@@ -144,8 +146,9 @@ public sealed class WordComparisonService
             }
 
             var mismatchedSizes = paragraph.Runs
-                .Where(run => !string.IsNullOrWhiteSpace(expectedFontSize) && !string.IsNullOrWhiteSpace(run.FontSize) && run.FontSize != expectedFontSize)
-                .Select(run => run.FontSize)
+                .Select(run => (Run: run, Expected: ExpectedRunValue(templateParagraph, paragraph, run.Index, template => template.FontSize, expectedFontSize)))
+                .Where(item => !string.IsNullOrWhiteSpace(item.Expected) && !string.IsNullOrWhiteSpace(item.Run.FontSize) && item.Run.FontSize != item.Expected)
+                .Select(item => item.Run.FontSize)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(3)
                 .ToList();
@@ -397,5 +400,25 @@ public sealed class WordComparisonService
         return paragraph.Area == "正文"
             ? $"第 {paragraph.Index} 段"
             : $"{paragraph.Area} / {paragraph.BlockType}（第 {paragraph.Index} 段）";
+    }
+
+    private static string ExpectedRunValue(
+        ParagraphSnapshot? templateParagraph,
+        ParagraphSnapshot targetParagraph,
+        int runIndex,
+        Func<RunFormatSnapshot, string> selector,
+        string paragraphFallback)
+    {
+        var templateRun = templateParagraph?.Runs.FirstOrDefault(run => run.Index == runIndex);
+        if (templateRun is not null)
+        {
+            var value = selector(templateRun);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return targetParagraph.Area == "正文" ? paragraphFallback : "";
     }
 }
