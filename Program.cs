@@ -20,6 +20,7 @@ builder.Services.AddSingleton<NormalDocumentService>();
 builder.Services.AddSingleton<WordTerminologyService>();
 builder.Services.AddSingleton<WordStyleResolver>();
 builder.Services.AddSingleton<TemplateRuleConflictService>();
+builder.Services.AddSingleton<EffectiveTemplateService>();
 
 var app = builder.Build();
 

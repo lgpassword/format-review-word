@@ -66,8 +66,13 @@ public sealed class WordAnalysisService
             var properties = paragraph.ParagraphProperties;
             var paragraphFormat = _styleResolver.ResolveParagraph(paragraph, mainPart);
             var runs = ExtractRuns(paragraph, mainPart);
-            var dominantFontName = MostCommonWeighted(runs.Select(run => (run.FontName, run.CharacterCount)));
-            var dominantFontNameRaw = MostCommonWeighted(runs.Select(run => (run.FontNameRaw, run.CharacterCount)));
+            var visibleText = VisibleText(paragraph);
+            var fieldText = FieldText(paragraph);
+            var dominantFontRuns = visibleText.Any(IsCjkCharacter)
+                ? runs.Where(run => run.Text.Any(IsCjkCharacter)).ToList()
+                : runs;
+            var dominantFontName = MostCommonWeighted(dominantFontRuns.Select(run => (run.FontName, run.CharacterCount)));
+            var dominantFontNameRaw = MostCommonWeighted(dominantFontRuns.Select(run => (run.FontNameRaw, run.CharacterCount)));
             var dominantFontSize = MostCommonWeighted(runs.Select(run => (run.FontSize, run.CharacterCount)));
             var dominantFontSizeRaw = MostCommonWeighted(runs.Select(run => (run.FontSizeRaw, run.CharacterCount)));
 
@@ -75,7 +80,8 @@ public sealed class WordAnalysisService
             {
                 TargetElementId = $"p:{i}",
                 Index = i + 1,
-                Text = paragraph.InnerText?.Trim() ?? "",
+                Text = string.IsNullOrWhiteSpace(visibleText) ? fieldText.Trim() : visibleText.Trim(),
+                FieldCodeText = fieldText,
                 StyleId = properties?.ParagraphStyleId?.Val?.Value ?? "",
                 JustificationRaw = paragraphFormat.JustificationRaw,
                 Justification = paragraphFormat.Justification,
@@ -92,7 +98,7 @@ public sealed class WordAnalysisService
                 LineSpacing = paragraphFormat.LineSpacing,
                 FirstLineIndentRaw = paragraphFormat.FirstLineIndentRaw,
                 FirstLineIndent = paragraphFormat.FirstLineIndent,
-                CharacterCount = paragraph.InnerText?.Length ?? 0,
+                CharacterCount = visibleText.Length,
                 RunCount = runs.Count,
                 HasDrawing = paragraph.Descendants<Drawing>().Any(),
                 Runs = runs
@@ -137,6 +143,11 @@ public sealed class WordAnalysisService
         }
 
         if (IsTocHeading(text))
+        {
+            return "目录";
+        }
+
+        if (currentArea == "目录" && (IsTocEntryText(text) || IsTocEntryText(paragraph.FieldCodeText)))
         {
             return "目录";
         }
@@ -243,7 +254,7 @@ public sealed class WordAnalysisService
             return "目录标题";
         }
 
-        return paragraph.Text.Contains('.') || paragraph.Text.Contains('…') || paragraph.Text.Contains('\t')
+        return IsTocEntryText(text) || IsTocEntryText(paragraph.FieldCodeText) || paragraph.Text.Contains('.') || paragraph.Text.Contains('…') || paragraph.Text.Contains('\t')
             ? "目录条目"
             : "目录文本";
     }
@@ -355,10 +366,13 @@ public sealed class WordAnalysisService
 
     private static bool IsBodyHeading(string text)
     {
-        return text.StartsWith("第1章", StringComparison.Ordinal) ||
-               text.StartsWith("第一章", StringComparison.Ordinal) ||
-               text.StartsWith("1.", StringComparison.Ordinal) ||
-               text.StartsWith("1、", StringComparison.Ordinal);
+        if (IsTocEntryText(text))
+        {
+            return false;
+        }
+
+        return IsChapterHeading(text) ||
+               IsNumberedHeading(text);
     }
 
     private static bool IsReferenceHeading(string text)
@@ -379,6 +393,31 @@ public sealed class WordAnalysisService
         return text is "致谢" or "谢辞" ||
                text.Equals("Acknowledgements", StringComparison.OrdinalIgnoreCase) ||
                text.Equals("Acknowledgments", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTocEntryText(string text)
+    {
+        return text.Contains("PAGEREF", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("HYPERLINK", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("_Toc", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsChapterHeading(string text)
+    {
+        return text.StartsWith("第", StringComparison.Ordinal) && text.Contains("章", StringComparison.Ordinal);
+    }
+
+    private static bool IsNumberedHeading(string text)
+    {
+        var dotIndex = text.IndexOf('.', StringComparison.Ordinal);
+        if (dotIndex <= 0 || dotIndex == text.Length - 1)
+        {
+            return text.StartsWith("1、", StringComparison.Ordinal);
+        }
+
+        return text[..dotIndex].All(char.IsDigit) &&
+               char.IsDigit(text[0]) &&
+               text[(dotIndex + 1)..].Any(IsCjkCharacter);
     }
 
     private static bool IsAsciiLetter(char character)
@@ -408,7 +447,7 @@ public sealed class WordAnalysisService
         for (var i = 0; i < runs.Count; i++)
         {
             var run = runs[i];
-            var text = run.InnerText ?? "";
+            var text = VisibleText(run);
             if (string.IsNullOrWhiteSpace(text))
             {
                 continue;
@@ -451,6 +490,21 @@ public sealed class WordAnalysisService
         }
 
         return result;
+    }
+
+    private static string VisibleText(Paragraph paragraph)
+    {
+        return string.Join("", paragraph.Descendants<Text>().Select(text => text.Text));
+    }
+
+    private static string VisibleText(Run run)
+    {
+        return string.Join("", run.Descendants<Text>().Select(text => text.Text));
+    }
+
+    private static string FieldText(Paragraph paragraph)
+    {
+        return string.Join("", paragraph.Descendants<FieldCode>().Select(field => field.Text));
     }
 
     private PageSetupSnapshot ExtractPageSetup(Body body)

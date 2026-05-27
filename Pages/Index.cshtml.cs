@@ -18,6 +18,7 @@ public class IndexModel : PageModel
     private readonly NormalDocumentService _normalDocument;
     private readonly IssueTextService _issueText;
     private readonly TemplateRuleConflictService _ruleConflicts;
+    private readonly EffectiveTemplateService _effectiveTemplate;
 
     public IndexModel(
         AppStorage storage,
@@ -29,7 +30,8 @@ public class IndexModel : PageModel
         WordConversionService converter,
         NormalDocumentService normalDocument,
         IssueTextService issueText,
-        TemplateRuleConflictService ruleConflicts)
+        TemplateRuleConflictService ruleConflicts,
+        EffectiveTemplateService effectiveTemplate)
     {
         _storage = storage;
         _sessions = sessions;
@@ -41,6 +43,7 @@ public class IndexModel : PageModel
         _normalDocument = normalDocument;
         _issueText = issueText;
         _ruleConflicts = ruleConflicts;
+        _effectiveTemplate = effectiveTemplate;
     }
 
     [BindProperty]
@@ -150,8 +153,8 @@ public class IndexModel : PageModel
         await SaveUploadAsync(TargetFile, targetPath);
         var targetAnalysisPath = await _converter.EnsureDocxAsync(targetPath, TargetFile.FileName);
         var targetAnalysis = _analysis.Analyze(targetAnalysisPath, TargetFile.FileName);
-        session.TemplateAnalysis.Baseline = _ruleConflicts.ApplySelections(session.TemplateAnalysis.Baseline, session.RuleConflicts);
-        var report = _comparison.Compare(session.TemplateAnalysis, targetAnalysis);
+        var effectiveTemplate = _effectiveTemplate.Build(session);
+        var report = _comparison.Compare(effectiveTemplate, targetAnalysis);
 
         var annotatedPath = _storage.CreateGeneratedPath($"{Path.GetFileNameWithoutExtension(TargetFile.FileName)}-格式检查批注.docx");
         _annotation.CreateAnnotatedCopy(targetAnalysisPath, annotatedPath, report.Issues);
@@ -162,7 +165,7 @@ public class IndexModel : PageModel
         report.HtmlReportDownloadName = Path.GetFileName(htmlPath);
 
         var normalPath = _storage.CreateGeneratedPath($"{Path.GetFileNameWithoutExtension(TargetFile.FileName)}-正常文档.docx");
-        _normalDocument.CreateNormalizedCopy(targetAnalysisPath, normalPath, session.TemplateAnalysis, report.Issues);
+        _normalDocument.CreateNormalizedCopy(targetAnalysisPath, normalPath, effectiveTemplate, report.Issues);
         report.NormalDocumentDownloadName = Path.GetFileName(normalPath);
 
         session.TargetFileName = TargetFile.FileName;

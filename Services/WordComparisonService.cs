@@ -122,7 +122,7 @@ public sealed class WordComparisonService
 
             var mismatchedFonts = paragraph.Runs
                 .Select(run => (Run: run, Expected: ExpectedRunValue(templateParagraph, paragraph, run.Index, template => template.FontName, expectedFontName)))
-                .Where(item => !string.IsNullOrWhiteSpace(item.Expected) && !string.IsNullOrWhiteSpace(item.Run.FontName) && item.Run.FontName != item.Expected)
+                .Where(item => ShouldCompareRunFont(paragraph, item.Run, item.Expected) && !string.IsNullOrWhiteSpace(item.Run.FontName) && item.Run.FontName != item.Expected)
                 .Select(item => item.Run.FontName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(3)
@@ -355,6 +355,8 @@ public sealed class WordComparisonService
             {
                 return value;
             }
+
+            return "";
         }
 
         return targetParagraph.Area == "正文" ? fallback : "";
@@ -362,6 +364,24 @@ public sealed class WordComparisonService
 
     private static ParagraphSnapshot? FindTemplateParagraph(IReadOnlyList<ParagraphSnapshot> templateParagraphs, ParagraphSnapshot targetParagraph)
     {
+        if (targetParagraph.Area == "正文")
+        {
+            var normalizedText = NormalizeMatchText(targetParagraph.Text);
+            if (!string.IsNullOrWhiteSpace(normalizedText))
+            {
+                var byText = templateParagraphs
+                    .Where(template => !template.IsEmpty && template.Area == targetParagraph.Area)
+                    .Where(template => NormalizeMatchText(template.Text) == normalizedText)
+                    .Take(2)
+                    .ToList();
+
+                if (byText.Count == 1)
+                {
+                    return byText[0];
+                }
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(targetParagraph.BlockKey))
         {
             var byBlockKey = templateParagraphs.FirstOrDefault(template =>
@@ -395,6 +415,26 @@ public sealed class WordComparisonService
         return null;
     }
 
+    private static bool ShouldCompareRunFont(ParagraphSnapshot paragraph, RunFormatSnapshot run, string expected)
+    {
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            return false;
+        }
+
+        return !paragraph.Text.Any(IsCjkCharacter) || run.Text.Any(IsCjkCharacter);
+    }
+
+    private static string NormalizeMatchText(string value)
+    {
+        return new string(value.Where(character => !char.IsWhiteSpace(character)).ToArray()).Trim();
+    }
+
+    private static bool IsCjkCharacter(char character)
+    {
+        return character is >= '\u4e00' and <= '\u9fff';
+    }
+
     private static string LocationText(ParagraphSnapshot paragraph)
     {
         return paragraph.Area == "正文"
@@ -417,8 +457,10 @@ public sealed class WordComparisonService
             {
                 return value;
             }
+
+            return "";
         }
 
-        return targetParagraph.Area == "正文" ? paragraphFallback : "";
+        return templateParagraph is null && targetParagraph.Area == "正文" ? paragraphFallback : "";
     }
 }

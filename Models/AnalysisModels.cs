@@ -51,6 +51,7 @@ public sealed class ParagraphSnapshot
     public string TargetElementId { get; set; } = "";
     public int Index { get; set; }
     public string Text { get; set; } = "";
+    public string FieldCodeText { get; set; } = "";
     public string Area { get; set; } = "正文";
     public string BlockType { get; set; } = "正文";
     public int BlockIndex { get; set; }
