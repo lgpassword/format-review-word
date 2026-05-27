@@ -19,8 +19,8 @@ public sealed class WordComparisonService
         var baseline = template.Baseline;
 
         AddPageSetupIssues(issues, baseline.PageSetup, target.PageSetup);
-        AddParagraphIssues(issues, baseline, target.Paragraphs);
-        AddRunIssues(issues, baseline, target.Paragraphs);
+        AddParagraphIssues(issues, template.Paragraphs, baseline, target.Paragraphs);
+        AddRunIssues(issues, template.Paragraphs, baseline, target.Paragraphs);
         AddTableIssues(issues, baseline, target.Tables);
         AddBlankAreaIssues(issues, target.BlankAreas);
         AddPunctuationIssues(issues, template, target);
@@ -39,31 +39,46 @@ public sealed class WordComparisonService
         };
     }
 
-    private void AddParagraphIssues(List<FormatIssue> issues, TemplateBaseline baseline, IEnumerable<ParagraphSnapshot> paragraphs)
+    private void AddParagraphIssues(
+        List<FormatIssue> issues,
+        IReadOnlyList<ParagraphSnapshot> templateParagraphs,
+        TemplateBaseline baseline,
+        IEnumerable<ParagraphSnapshot> paragraphs)
     {
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
+            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontName, baseline.CommonFontName);
+            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontSize, baseline.CommonFontSize);
+            var expectedJustification = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.Justification, baseline.CommonJustification);
+            var expectedSpacingBefore = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.SpacingBefore, baseline.CommonSpacingBefore);
+            var expectedSpacingAfter = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.SpacingAfter, baseline.CommonSpacingAfter);
+            var expectedLineSpacing = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.LineSpacing, baseline.CommonLineSpacing);
+
             AddIfDifferent(issues, "F", "错误", "字体字号", paragraph, "字体不符合模板",
-                baseline.CommonFontName, paragraph.FontName, $"选中第 {paragraph.Index} 段文字，将字体改为模板常用字体。");
+                expectedFontName, paragraph.FontName, $"选中第 {paragraph.Index} 段文字，将字体改为 {expectedFontName}。");
 
             AddIfDifferent(issues, "F", "错误", "字体字号", paragraph, "字号不符合模板",
-                baseline.CommonFontSize, paragraph.FontSize, $"选中第 {paragraph.Index} 段文字，将字号改为模板常用字号。");
+                expectedFontSize, paragraph.FontSize, $"选中第 {paragraph.Index} 段文字，将字号改为 {expectedFontSize}。");
 
             AddIfDifferent(issues, "S", "错误", "段落", paragraph, "对齐方式不符合模板",
-                baseline.CommonJustification, paragraph.Justification, "打开段落设置，将对齐方式改为模板要求。");
+                expectedJustification, paragraph.Justification, $"打开段落设置，将对齐方式改为 {expectedJustification}。");
 
             AddIfDifferent(issues, "S", "错误", "段落", paragraph, "段前间距不符合模板",
-                baseline.CommonSpacingBefore, paragraph.SpacingBefore, "打开段落设置，调整段前间距。");
+                expectedSpacingBefore, paragraph.SpacingBefore, $"打开段落设置，将段前间距改为 {expectedSpacingBefore}。");
 
             AddIfDifferent(issues, "S", "错误", "段落", paragraph, "段后间距不符合模板",
-                baseline.CommonSpacingAfter, paragraph.SpacingAfter, "打开段落设置，调整段后间距。");
+                expectedSpacingAfter, paragraph.SpacingAfter, $"打开段落设置，将段后间距改为 {expectedSpacingAfter}。");
 
             AddIfDifferent(issues, "S", "错误", "段落", paragraph, "行距不符合模板",
-                baseline.CommonLineSpacing, paragraph.LineSpacing, "打开段落设置，调整行距。");
+                expectedLineSpacing, paragraph.LineSpacing, $"打开段落设置，将行距改为 {expectedLineSpacing}。");
         }
     }
 
-    private void AddRunIssues(List<FormatIssue> issues, TemplateBaseline baseline, IEnumerable<ParagraphSnapshot> paragraphs)
+    private void AddRunIssues(
+        List<FormatIssue> issues,
+        IReadOnlyList<ParagraphSnapshot> templateParagraphs,
+        TemplateBaseline baseline,
+        IEnumerable<ParagraphSnapshot> paragraphs)
     {
         if (string.IsNullOrWhiteSpace(baseline.CommonFontName) && string.IsNullOrWhiteSpace(baseline.CommonFontSize))
         {
@@ -72,14 +87,17 @@ public sealed class WordComparisonService
 
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
+            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontName, baseline.CommonFontName);
+            var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph.Index, template => template.FontSize, baseline.CommonFontSize);
+
             var mismatchedFonts = paragraph.Runs
-                .Where(run => !string.IsNullOrWhiteSpace(baseline.CommonFontName) && !string.IsNullOrWhiteSpace(run.FontName) && run.FontName != baseline.CommonFontName)
+                .Where(run => !string.IsNullOrWhiteSpace(expectedFontName) && !string.IsNullOrWhiteSpace(run.FontName) && run.FontName != expectedFontName)
                 .Select(run => run.FontName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(3)
                 .ToList();
 
-            if (mismatchedFonts.Count > 0 && paragraph.FontName == baseline.CommonFontName)
+            if (mismatchedFonts.Count > 0 && paragraph.FontName == expectedFontName)
             {
                 issues.Add(new FormatIssue
                 {
@@ -90,20 +108,20 @@ public sealed class WordComparisonService
                     TargetElementId = paragraph.TargetElementId,
                     Area = "正文",
                     Title = "段内部分文字字体不符合模板",
-                    Expected = baseline.CommonFontName,
+                    Expected = expectedFontName,
                     Actual = string.Join("、", mismatchedFonts),
-                    Suggestion = $"选中第 {paragraph.Index} 段中字体不一致的文字，将字体改为 {baseline.CommonFontName}。"
+                    Suggestion = $"选中第 {paragraph.Index} 段中字体不一致的文字，将字体改为 {expectedFontName}。"
                 });
             }
 
             var mismatchedSizes = paragraph.Runs
-                .Where(run => !string.IsNullOrWhiteSpace(baseline.CommonFontSize) && !string.IsNullOrWhiteSpace(run.FontSize) && run.FontSize != baseline.CommonFontSize)
+                .Where(run => !string.IsNullOrWhiteSpace(expectedFontSize) && !string.IsNullOrWhiteSpace(run.FontSize) && run.FontSize != expectedFontSize)
                 .Select(run => run.FontSize)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(3)
                 .ToList();
 
-            if (mismatchedSizes.Count > 0 && paragraph.FontSize == baseline.CommonFontSize)
+            if (mismatchedSizes.Count > 0 && paragraph.FontSize == expectedFontSize)
             {
                 issues.Add(new FormatIssue
                 {
@@ -114,9 +132,9 @@ public sealed class WordComparisonService
                     TargetElementId = paragraph.TargetElementId,
                     Area = "正文",
                     Title = "段内部分文字字号不符合模板",
-                    Expected = baseline.CommonFontSize,
+                    Expected = expectedFontSize,
                     Actual = string.Join("、", mismatchedSizes),
-                    Suggestion = $"选中第 {paragraph.Index} 段中字号不一致的文字，将字号改为 {baseline.CommonFontSize}。"
+                    Suggestion = $"选中第 {paragraph.Index} 段中字号不一致的文字，将字号改为 {expectedFontSize}。"
                 });
             }
         }
@@ -288,5 +306,27 @@ public sealed class WordComparisonService
         value++;
         _counters[prefix] = value;
         return $"{prefix}-{value:000}";
+    }
+
+    private static string ExpectedParagraphValue(
+        IReadOnlyList<ParagraphSnapshot> templateParagraphs,
+        int paragraphIndex,
+        Func<ParagraphSnapshot, string> selector,
+        string fallback)
+    {
+        var templateParagraph = paragraphIndex > 0 && paragraphIndex <= templateParagraphs.Count
+            ? templateParagraphs[paragraphIndex - 1]
+            : null;
+
+        if (templateParagraph is not null && !templateParagraph.IsEmpty)
+        {
+            var value = selector(templateParagraph);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return fallback;
     }
 }
