@@ -15,6 +15,8 @@ public sealed class TemplateRuleConflictService
     {
         var conflicts = new List<TemplateRuleConflict>();
         AddConflict(conflicts, "字体字号", "常见字体", primary.Baseline.CommonFontName, reference.Baseline.CommonFontName, primary.Baseline.CommonFontNameRaw, reference.Baseline.CommonFontNameRaw, reference.FileName);
+        AddConflict(conflicts, "字体字号", "常见中文字体", primary.Baseline.CommonChineseFontName, reference.Baseline.CommonChineseFontName, primary.Baseline.CommonChineseFontNameRaw, reference.Baseline.CommonChineseFontNameRaw, reference.FileName);
+        AddConflict(conflicts, "字体字号", "常见西文字体", primary.Baseline.CommonWesternFontName, reference.Baseline.CommonWesternFontName, primary.Baseline.CommonWesternFontNameRaw, reference.Baseline.CommonWesternFontNameRaw, reference.FileName);
         AddConflict(conflicts, "字体字号", "常见字号", primary.Baseline.CommonFontSize, reference.Baseline.CommonFontSize, primary.Baseline.CommonFontSizeRaw, reference.Baseline.CommonFontSizeRaw, reference.FileName);
         AddConflict(conflicts, "段落", "对齐方式", primary.Baseline.CommonJustification, reference.Baseline.CommonJustification, primary.Baseline.CommonJustificationRaw, reference.Baseline.CommonJustificationRaw, reference.FileName);
         AddConflict(conflicts, "段落", "段前间距", primary.Baseline.CommonSpacingBefore, reference.Baseline.CommonSpacingBefore, primary.Baseline.CommonSpacingBeforeRaw, reference.Baseline.CommonSpacingBeforeRaw, reference.FileName);
@@ -55,6 +57,14 @@ public sealed class TemplateRuleConflictService
                 case "常见字体":
                     baseline.CommonFontName = conflict.SelectedValue;
                     baseline.CommonFontNameRaw = conflict.RawSelectedValue;
+                    break;
+                case "常见中文字体":
+                    baseline.CommonChineseFontName = conflict.SelectedValue;
+                    baseline.CommonChineseFontNameRaw = conflict.RawSelectedValue;
+                    break;
+                case "常见西文字体":
+                    baseline.CommonWesternFontName = conflict.SelectedValue;
+                    baseline.CommonWesternFontNameRaw = conflict.RawSelectedValue;
                     break;
                 case "常见字号":
                     baseline.CommonFontSize = conflict.SelectedValue;
@@ -188,6 +198,8 @@ public sealed class TemplateRuleConflictService
         return ruleName switch
         {
             "常见字体" => (_terms.FontName(trimmed), trimmed),
+            "常见中文字体" => (_terms.FontName(trimmed), trimmed),
+            "常见西文字体" => (_terms.FontName(trimmed), trimmed),
             "常见字号" => NormalizeFontSize(trimmed),
             "对齐方式" => NormalizeJustification(trimmed),
             "段前间距" or "段后间距" or "首行缩进" => NormalizeSpacing(trimmed),

@@ -61,6 +61,10 @@ public sealed class ParagraphSnapshot
     public string JustificationRaw { get; set; } = "";
     public string FontName { get; set; } = "";
     public string FontNameRaw { get; set; } = "";
+    public string ChineseFontName { get; set; } = "";
+    public string ChineseFontNameRaw { get; set; } = "";
+    public string WesternFontName { get; set; } = "";
+    public string WesternFontNameRaw { get; set; } = "";
     public string FontSize { get; set; } = "";
     public string FontSizeRaw { get; set; } = "";
     public bool? Bold { get; set; }
@@ -85,10 +89,16 @@ public sealed class RunFormatSnapshot
     public string Text { get; set; } = "";
     public string FontName { get; set; } = "";
     public string FontNameRaw { get; set; } = "";
+    public string ChineseFontName { get; set; } = "";
+    public string ChineseFontNameRaw { get; set; } = "";
+    public string WesternFontName { get; set; } = "";
+    public string WesternFontNameRaw { get; set; } = "";
     public string FontSize { get; set; } = "";
     public string FontSizeRaw { get; set; } = "";
     public bool? Bold { get; set; }
     public int CharacterCount { get; set; }
+    public int CjkCharacterCount { get; set; }
+    public int WesternCharacterCount { get; set; }
 }
 
 public sealed class TableSnapshot
@@ -129,6 +139,10 @@ public sealed class TemplateBaseline
 {
     public string CommonFontName { get; set; } = "";
     public string CommonFontNameRaw { get; set; } = "";
+    public string CommonChineseFontName { get; set; } = "";
+    public string CommonChineseFontNameRaw { get; set; } = "";
+    public string CommonWesternFontName { get; set; } = "";
+    public string CommonWesternFontNameRaw { get; set; } = "";
     public string CommonFontSize { get; set; } = "";
     public string CommonFontSizeRaw { get; set; } = "";
     public string CommonJustification { get; set; } = "";

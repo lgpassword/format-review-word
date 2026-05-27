@@ -68,9 +68,13 @@ public sealed class WordAnalysisService
             var runs = ExtractRuns(paragraph, mainPart);
             var visibleText = VisibleText(paragraph);
             var fieldText = FieldText(paragraph);
-            var dominantFontRuns = visibleText.Any(IsCjkCharacter)
-                ? runs.Where(run => run.Text.Any(IsCjkCharacter)).ToList()
-                : runs;
+            var chineseRuns = runs.Where(run => run.CjkCharacterCount > 0).ToList();
+            var westernRuns = runs.Where(run => run.WesternCharacterCount > 0).ToList();
+            var dominantFontRuns = chineseRuns.Count > 0 ? chineseRuns : westernRuns.Count > 0 ? westernRuns : runs;
+            var dominantChineseFontName = MostCommonWeighted(chineseRuns.Select(run => (run.ChineseFontName, run.CjkCharacterCount)));
+            var dominantChineseFontNameRaw = MostCommonWeighted(chineseRuns.Select(run => (run.ChineseFontNameRaw, run.CjkCharacterCount)));
+            var dominantWesternFontName = MostCommonWeighted(westernRuns.Select(run => (run.WesternFontName, run.WesternCharacterCount)));
+            var dominantWesternFontNameRaw = MostCommonWeighted(westernRuns.Select(run => (run.WesternFontNameRaw, run.WesternCharacterCount)));
             var dominantFontName = MostCommonWeighted(dominantFontRuns.Select(run => (run.FontName, run.CharacterCount)));
             var dominantFontNameRaw = MostCommonWeighted(dominantFontRuns.Select(run => (run.FontNameRaw, run.CharacterCount)));
             var dominantFontSize = MostCommonWeighted(runs.Select(run => (run.FontSize, run.CharacterCount)));
@@ -87,6 +91,10 @@ public sealed class WordAnalysisService
                 Justification = paragraphFormat.Justification,
                 FontNameRaw = dominantFontNameRaw,
                 FontName = dominantFontName,
+                ChineseFontNameRaw = dominantChineseFontNameRaw,
+                ChineseFontName = dominantChineseFontName,
+                WesternFontNameRaw = dominantWesternFontNameRaw,
+                WesternFontName = dominantWesternFontName,
                 FontSizeRaw = dominantFontSizeRaw,
                 FontSize = dominantFontSize,
                 Bold = runs.Select(run => run.Bold).FirstOrDefault(value => value is not null),
@@ -425,6 +433,11 @@ public sealed class WordAnalysisService
         return character is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
     }
 
+    private static bool IsAsciiLetterOrDigit(char character)
+    {
+        return character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9';
+    }
+
     private static bool IsCjkCharacter(char character)
     {
         return character is >= '\u4e00' and <= '\u9fff';
@@ -460,10 +473,16 @@ public sealed class WordAnalysisService
                 Text = text,
                 FontNameRaw = format.FontNameRaw,
                 FontName = format.FontName,
+                ChineseFontNameRaw = format.ChineseFontNameRaw,
+                ChineseFontName = format.ChineseFontName,
+                WesternFontNameRaw = format.WesternFontNameRaw,
+                WesternFontName = format.WesternFontName,
                 FontSizeRaw = format.FontSizeRaw,
                 FontSize = format.FontSize,
                 Bold = format.Bold,
-                CharacterCount = text.Length
+                CharacterCount = text.Length,
+                CjkCharacterCount = text.Count(IsCjkCharacter),
+                WesternCharacterCount = text.Count(IsAsciiLetterOrDigit)
             });
         }
 
@@ -581,6 +600,10 @@ public sealed class WordAnalysisService
         {
             CommonFontName = MostCommon(nonEmpty.Select(p => p.FontName)),
             CommonFontNameRaw = MostCommon(nonEmpty.Select(p => p.FontNameRaw)),
+            CommonChineseFontName = MostCommon(nonEmpty.Select(p => p.ChineseFontName)),
+            CommonChineseFontNameRaw = MostCommon(nonEmpty.Select(p => p.ChineseFontNameRaw)),
+            CommonWesternFontName = MostCommon(nonEmpty.Select(p => p.WesternFontName)),
+            CommonWesternFontNameRaw = MostCommon(nonEmpty.Select(p => p.WesternFontNameRaw)),
             CommonFontSize = MostCommon(nonEmpty.Select(p => p.FontSize)),
             CommonFontSizeRaw = MostCommon(nonEmpty.Select(p => p.FontSizeRaw)),
             CommonJustification = MostCommon(nonEmpty.Select(p => p.Justification)),

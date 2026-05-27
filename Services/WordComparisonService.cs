@@ -49,15 +49,25 @@ public sealed class WordComparisonService
         {
             AddUnmatchedBlockIssueIfNeeded(issues, templateParagraphs, paragraph);
 
-            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontName, baseline.CommonFontName);
+            var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.ChineseFontName, baseline.CommonChineseFontName);
+            var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.WesternFontName, baseline.CommonWesternFontName);
             var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontSize, baseline.CommonFontSize);
             var expectedJustification = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.Justification, baseline.CommonJustification);
             var expectedSpacingBefore = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.SpacingBefore, baseline.CommonSpacingBefore);
             var expectedSpacingAfter = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.SpacingAfter, baseline.CommonSpacingAfter);
             var expectedLineSpacing = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.LineSpacing, baseline.CommonLineSpacing);
 
-            AddIfDifferent(issues, "F", "错误", "字体字号", paragraph, "字体不符合模板",
-                expectedFontName, paragraph.FontName, $"选中第 {paragraph.Index} 段文字，将字体改为 {expectedFontName}。");
+            if (paragraph.Text.Any(IsCjkCharacter))
+            {
+                AddIfDifferent(issues, "F", "错误", "字体字号", paragraph, "中文字体不符合模板",
+                    expectedChineseFontName, paragraph.ChineseFontName, $"选中第 {paragraph.Index} 段中文文字，将中文字体改为 {expectedChineseFontName}。");
+            }
+
+            if (paragraph.Text.Any(IsAsciiLetterOrDigit))
+            {
+                AddIfDifferent(issues, "F", "错误", "字体字号", paragraph, "西文字体不符合模板",
+                    expectedWesternFontName, paragraph.WesternFontName, $"选中第 {paragraph.Index} 段英文和数字，将西文字体改为 {expectedWesternFontName}。");
+            }
 
             AddIfDifferent(issues, "F", "错误", "字体字号", paragraph, "字号不符合模板",
                 expectedFontSize, paragraph.FontSize, $"选中第 {paragraph.Index} 段文字，将字号改为 {expectedFontSize}。");
@@ -109,7 +119,9 @@ public sealed class WordComparisonService
         TemplateBaseline baseline,
         IEnumerable<ParagraphSnapshot> paragraphs)
     {
-        if (string.IsNullOrWhiteSpace(baseline.CommonFontName) && string.IsNullOrWhiteSpace(baseline.CommonFontSize))
+        if (string.IsNullOrWhiteSpace(baseline.CommonChineseFontName) &&
+            string.IsNullOrWhiteSpace(baseline.CommonWesternFontName) &&
+            string.IsNullOrWhiteSpace(baseline.CommonFontSize))
         {
             return;
         }
@@ -117,18 +129,20 @@ public sealed class WordComparisonService
         foreach (var paragraph in paragraphs.Where(p => !p.IsEmpty))
         {
             var templateParagraph = FindTemplateParagraph(templateParagraphs, paragraph);
-            var expectedFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontName, baseline.CommonFontName);
+            var expectedChineseFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.ChineseFontName, baseline.CommonChineseFontName);
+            var expectedWesternFontName = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.WesternFontName, baseline.CommonWesternFontName);
             var expectedFontSize = ExpectedParagraphValue(templateParagraphs, paragraph, template => template.FontSize, baseline.CommonFontSize);
 
-            var mismatchedFonts = paragraph.Runs
-                .Select(run => (Run: run, Expected: ExpectedRunValue(templateParagraph, paragraph, run.Index, template => template.FontName, expectedFontName)))
-                .Where(item => ShouldCompareRunFont(paragraph, item.Run, item.Expected) && !string.IsNullOrWhiteSpace(item.Run.FontName) && item.Run.FontName != item.Expected)
-                .Select(item => item.Run.FontName)
+            var mismatchedChineseFonts = paragraph.Runs
+                .Where(run => run.CjkCharacterCount > 0)
+                .Select(run => (Run: run, Expected: ExpectedRunValue(templateParagraph, paragraph, run.Index, template => template.ChineseFontName, expectedChineseFontName)))
+                .Where(item => !string.IsNullOrWhiteSpace(item.Expected) && !string.IsNullOrWhiteSpace(item.Run.ChineseFontName) && item.Run.ChineseFontName != item.Expected)
+                .Select(item => item.Run.ChineseFontName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(3)
                 .ToList();
 
-            if (mismatchedFonts.Count > 0 && paragraph.FontName == expectedFontName)
+            if (mismatchedChineseFonts.Count > 0 && paragraph.ChineseFontName == expectedChineseFontName)
             {
                 issues.Add(new FormatIssue
                 {
@@ -138,10 +152,36 @@ public sealed class WordComparisonService
                     Location = LocationText(paragraph),
                     TargetElementId = paragraph.TargetElementId,
                     Area = paragraph.Area,
-                    Title = "段内部分文字字体不符合模板",
-                    Expected = expectedFontName,
-                    Actual = string.Join("、", mismatchedFonts),
-                    Suggestion = $"选中第 {paragraph.Index} 段中字体不一致的文字，将字体改为 {expectedFontName}。"
+                    Title = "段内部分中文字体不符合模板",
+                    Expected = expectedChineseFontName,
+                    Actual = string.Join("、", mismatchedChineseFonts),
+                    Suggestion = $"选中第 {paragraph.Index} 段中中文字体不一致的文字，将中文字体改为 {expectedChineseFontName}。"
+                });
+            }
+
+            var mismatchedWesternFonts = paragraph.Runs
+                .Where(run => run.WesternCharacterCount > 0)
+                .Select(run => (Run: run, Expected: ExpectedRunValue(templateParagraph, paragraph, run.Index, template => template.WesternFontName, expectedWesternFontName)))
+                .Where(item => !string.IsNullOrWhiteSpace(item.Expected) && !string.IsNullOrWhiteSpace(item.Run.WesternFontName) && item.Run.WesternFontName != item.Expected)
+                .Select(item => item.Run.WesternFontName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToList();
+
+            if (mismatchedWesternFonts.Count > 0 && paragraph.WesternFontName == expectedWesternFontName)
+            {
+                issues.Add(new FormatIssue
+                {
+                    IssueCode = NextCode("F"),
+                    Severity = "错误",
+                    Category = "字体字号",
+                    Location = LocationText(paragraph),
+                    TargetElementId = paragraph.TargetElementId,
+                    Area = paragraph.Area,
+                    Title = "段内部分西文字体不符合模板",
+                    Expected = expectedWesternFontName,
+                    Actual = string.Join("、", mismatchedWesternFonts),
+                    Suggestion = $"选中第 {paragraph.Index} 段中英文或数字字体不一致的文字，将西文字体改为 {expectedWesternFontName}。"
                 });
             }
 
@@ -415,16 +455,6 @@ public sealed class WordComparisonService
         return null;
     }
 
-    private static bool ShouldCompareRunFont(ParagraphSnapshot paragraph, RunFormatSnapshot run, string expected)
-    {
-        if (string.IsNullOrWhiteSpace(expected))
-        {
-            return false;
-        }
-
-        return !paragraph.Text.Any(IsCjkCharacter) || run.Text.Any(IsCjkCharacter);
-    }
-
     private static string NormalizeMatchText(string value)
     {
         return new string(value.Where(character => !char.IsWhiteSpace(character)).ToArray()).Trim();
@@ -433,6 +463,11 @@ public sealed class WordComparisonService
     private static bool IsCjkCharacter(char character)
     {
         return character is >= '\u4e00' and <= '\u9fff';
+    }
+
+    private static bool IsAsciiLetterOrDigit(char character)
+    {
+        return character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9';
     }
 
     private static string LocationText(ParagraphSnapshot paragraph)

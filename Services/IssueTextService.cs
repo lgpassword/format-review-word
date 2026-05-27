@@ -12,6 +12,8 @@ public sealed class IssueTextService
             "字体字号" => issue.Title switch
             {
                 "字体不符合模板" => "字体与模板不一致",
+                "中文字体不符合模板" => "中文字体与模板不一致",
+                "西文字体不符合模板" => "西文字体与模板不一致",
                 "字号不符合模板" => "字号与模板不一致",
                 _ => issue.Title
             },

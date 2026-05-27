@@ -45,7 +45,8 @@
             <div><dt>批注数量</dt><dd>@Model.Session.TemplateAnalysis.Comments.Count</dd></div>
             <div><dt>段落数量</dt><dd>@Model.Session.TemplateAnalysis.Paragraphs.Count</dd></div>
             <div><dt>表格数量</dt><dd>@Model.Session.TemplateAnalysis.Tables.Count</dd></div>
-            <div><dt>常见字体</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonFontName.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonFontName)</dd></div>
+            <div><dt>常见中文字体</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonChineseFontName.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonChineseFontName)</dd></div>
+            <div><dt>常见西文字体</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonWesternFontName.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonWesternFontName)</dd></div>
             <div><dt>常见字号</dt><dd>@(Model.Session.TemplateAnalysis.Baseline.CommonFontSize.Length == 0 ? "未识别" : Model.Session.TemplateAnalysis.Baseline.CommonFontSize)</dd></div>
         </dl>
 

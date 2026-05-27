@@ -71,7 +71,11 @@ public sealed class WordStyleResolver
         var characterStyleChain = StyleChain(characterStyle, mainPart, StyleValues.Character).ToList();
         var defaults = mainPart.StyleDefinitionsPart?.Styles?.DocDefaults?.RunPropertiesDefault?.RunPropertiesBaseStyle;
 
-        var rawFont = ResolveFont(run.InnerText ?? "", direct, characterStyleChain, paragraphStyleChain, defaults);
+        var rawChineseFont = ResolveChineseFont(direct, characterStyleChain, paragraphStyleChain, defaults);
+        var rawWesternFont = ResolveWesternFont(direct, characterStyleChain, paragraphStyleChain, defaults);
+        var rawFont = ContainsCjk(run.InnerText ?? "")
+            ? FirstNonEmpty(rawChineseFont, rawWesternFont)
+            : FirstNonEmpty(rawWesternFont, rawChineseFont);
 
         var rawSize = FirstNonEmpty(
             direct?.FontSize?.Val?.Value,
@@ -89,7 +93,16 @@ public sealed class WordStyleResolver
             paragraphStyleChain.Select(item => item.StyleRunProperties?.Bold),
             [defaults?.Bold]);
 
-        return new ResolvedRunFormat(rawFont, _terminology.FontName(rawFont), rawSize, _terminology.FontSize(rawSize), bold);
+        return new ResolvedRunFormat(
+            rawFont,
+            _terminology.FontName(rawFont),
+            rawChineseFont,
+            _terminology.FontName(rawChineseFont),
+            rawWesternFont,
+            _terminology.FontName(rawWesternFont),
+            rawSize,
+            _terminology.FontSize(rawSize),
+            bold);
     }
 
     private static Style? ResolveParagraphStyle(string? styleId, MainDocumentPart mainPart)
@@ -135,32 +148,30 @@ public sealed class WordStyleResolver
         }
     }
 
-    private static string ResolveFont(
-        string text,
+    private static string ResolveChineseFont(
         RunProperties? direct,
         IReadOnlyList<Style> characterStyles,
         IReadOnlyList<Style> paragraphStyles,
         RunPropertiesBaseStyle? defaults)
     {
-        return ContainsCjk(text)
-            ? FirstNonEmpty(
-                EastAsiaFonts(direct),
-                characterStyles.SelectMany(style => EastAsiaFonts(style.StyleRunProperties)),
-                paragraphStyles.SelectMany(style => EastAsiaFonts(style.StyleRunProperties)),
-                EastAsiaFonts(defaults),
-                WesternFonts(direct),
-                characterStyles.SelectMany(style => WesternFonts(style.StyleRunProperties)),
-                paragraphStyles.SelectMany(style => WesternFonts(style.StyleRunProperties)),
-                WesternFonts(defaults))
-            : FirstNonEmpty(
-                WesternFonts(direct),
-                characterStyles.SelectMany(style => WesternFonts(style.StyleRunProperties)),
-                paragraphStyles.SelectMany(style => WesternFonts(style.StyleRunProperties)),
-                WesternFonts(defaults),
-                EastAsiaFonts(direct),
-                characterStyles.SelectMany(style => EastAsiaFonts(style.StyleRunProperties)),
-                paragraphStyles.SelectMany(style => EastAsiaFonts(style.StyleRunProperties)),
-                EastAsiaFonts(defaults));
+        return FirstNonEmpty(
+            EastAsiaFonts(direct),
+            characterStyles.SelectMany(style => EastAsiaFonts(style.StyleRunProperties)),
+            paragraphStyles.SelectMany(style => EastAsiaFonts(style.StyleRunProperties)),
+            EastAsiaFonts(defaults));
+    }
+
+    private static string ResolveWesternFont(
+        RunProperties? direct,
+        IReadOnlyList<Style> characterStyles,
+        IReadOnlyList<Style> paragraphStyles,
+        RunPropertiesBaseStyle? defaults)
+    {
+        return FirstNonEmpty(
+            WesternFonts(direct),
+            characterStyles.SelectMany(style => WesternFonts(style.StyleRunProperties)),
+            paragraphStyles.SelectMany(style => WesternFonts(style.StyleRunProperties)),
+            WesternFonts(defaults));
     }
 
     private static IEnumerable<string?> EastAsiaFonts(OpenXmlCompositeElement? properties)
@@ -231,6 +242,10 @@ public sealed record ResolvedParagraphFormat(
 public sealed record ResolvedRunFormat(
     string FontNameRaw,
     string FontName,
+    string ChineseFontNameRaw,
+    string ChineseFontName,
+    string WesternFontNameRaw,
+    string WesternFontName,
     string FontSizeRaw,
     string FontSize,
     bool? Bold);

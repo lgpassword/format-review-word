@@ -89,9 +89,22 @@ public sealed class NormalDocumentService
             if (!string.IsNullOrWhiteSpace(baseline.CommonFontNameRaw))
             {
                 runProperties.RunFonts ??= new RunFonts();
+                runProperties.RunFonts.EastAsia = baseline.CommonFontNameRaw;
                 runProperties.RunFonts.Ascii = baseline.CommonFontNameRaw;
                 runProperties.RunFonts.HighAnsi = baseline.CommonFontNameRaw;
-                runProperties.RunFonts.EastAsia = baseline.CommonFontNameRaw;
+            }
+
+            if (!string.IsNullOrWhiteSpace(baseline.CommonChineseFontNameRaw))
+            {
+                runProperties.RunFonts ??= new RunFonts();
+                runProperties.RunFonts.EastAsia = baseline.CommonChineseFontNameRaw;
+            }
+
+            if (!string.IsNullOrWhiteSpace(baseline.CommonWesternFontNameRaw))
+            {
+                runProperties.RunFonts ??= new RunFonts();
+                runProperties.RunFonts.Ascii = baseline.CommonWesternFontNameRaw;
+                runProperties.RunFonts.HighAnsi = baseline.CommonWesternFontNameRaw;
             }
 
             if (!string.IsNullOrWhiteSpace(baseline.CommonFontSizeRaw))

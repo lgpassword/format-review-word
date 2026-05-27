@@ -35,6 +35,10 @@ public sealed class EffectiveTemplateService
             {
                 CommonFontName = source.Baseline.CommonFontName,
                 CommonFontNameRaw = source.Baseline.CommonFontNameRaw,
+                CommonChineseFontName = source.Baseline.CommonChineseFontName,
+                CommonChineseFontNameRaw = source.Baseline.CommonChineseFontNameRaw,
+                CommonWesternFontName = source.Baseline.CommonWesternFontName,
+                CommonWesternFontNameRaw = source.Baseline.CommonWesternFontNameRaw,
                 CommonFontSize = source.Baseline.CommonFontSize,
                 CommonFontSizeRaw = source.Baseline.CommonFontSizeRaw,
                 CommonJustification = source.Baseline.CommonJustification,
