@@ -6,10 +6,10 @@ Phase 1: MVP Vertical Slice complete.
 
 Next planned work: Phase 2, refined Word-format engine and coverage reporting.
 
-## Current Beads
+## Completed Work Items
 
 - `WordFormatAnalyzer-wu2`: Phase 1 feature umbrella.
-- `WordFormatAnalyzer-1xg`: GSD planning artifacts.
+- `WordFormatAnalyzer-1xg`: Planning artifacts.
 - `WordFormatAnalyzer-zqm`: ASP.NET SQLite project scaffold.
 - `WordFormatAnalyzer-jch`: Two-step workflow.
 - `WordFormatAnalyzer-7oj`: Word annotation write-back.
@@ -41,7 +41,7 @@ Next planned work: Phase 2, refined Word-format engine and coverage reporting.
 
 ## Exploration Capture
 
-The advanced requirements from the latest `$gsd-explore` session have been captured in:
+The advanced requirements have been captured in:
 
 - `.planning/REQUIREMENTS.md`
 - `.planning/ROADMAP.md`

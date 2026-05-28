@@ -6,7 +6,7 @@ Goal: Ship a usable local ASP.NET Core + SQLite application that performs the fu
 
 Deliverables:
 
-- GSD and beads tracking initialized.
+- Project planning documents prepared.
 - ASP.NET Core Razor Pages project.
 - SQLite database initialization.
 - OpenXML document analysis service.

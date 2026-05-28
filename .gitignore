@@ -1,8 +1,4 @@
 
-# Beads / Dolt local files
-.dolt/
-.beads-credential-key
-
 # .NET
 bin/
 obj/

@@ -93,7 +93,7 @@ Rules that cannot be safely judged should not be applied. They remain report iss
 
 ## R8 Background Processing And Rule Confirmation
 
-Long-running checks must run as background jobs. The page must show progress percentage, current area/object, and issue count found so far, then refresh and show a completion prompt when done.
+Long-running checks must run as background work. The page must show progress percentage, current area/object, and issue count found so far, then refresh and show a completion message when done.
 
 Manual rule confirmation must use a problem-detail modal with area, check item, current value, template requirement, scope, and notes. Confirmed rules affect only the current detection session, re-check only the related area, and are recorded in the HTML report only.
 
