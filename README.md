@@ -1,18 +1,16 @@
-# WordFormatAnalyzer / Word 格式检查系统
+# Word 格式检查系统
 
-WordFormatAnalyzer is a local ASP.NET Core Razor Pages application for reviewing Word document formatting against a template. It analyzes a Word template or user-defined module rules, compares a target document, then produces a readable report, an annotated Word copy, an HTML report, and a normalized Word document.
+[English](README.en.md)
 
 WordFormatAnalyzer 是一个本地运行的 ASP.NET Core Razor Pages Web 应用，用于根据 Word 模板或用户填写的模块规则检查文档格式。系统会分析模板、比对待检查文档，并输出页面报告、带批注 Word、HTML 报告和自动调整后的正常文档。
 
-## 中文说明
-
-### 项目目标
+## 项目目标
 
 本项目面向论文、报告、合同、方案书、投标文件等需要统一排版规范的 Word 文档审查场景。用户可以先上传模板文档，系统从模板中提取批注、段落格式、字体字号、表格结构、页面设置等信息；随后上传实际文档，系统根据模板规则生成格式问题报告。
 
 系统也支持“用户自定义模块规则检查”：先上传需要检查的文档，系统将文档拆分为封面、目录、摘要、正文、参考文献、附录等模块，再由用户为不同模块填写检查要求并执行检查。
 
-### 主要功能
+## 主要功能
 
 - 支持 `.docx` 文件分析。
 - 支持 `.doc` 上传；在 Windows 且安装 Microsoft Word 的环境中会转换为 `.docx` 后再分析。
@@ -29,7 +27,7 @@ WordFormatAnalyzer 是一个本地运行的 ASP.NET Core Razor Pages Web 应用�
 - 生成按规则调整后的正常 Word 文档。
 - 使用 SQLite 保存分析会话、规则选择、报告和生成文件路径。
 
-### 技术栈
+## 技术栈
 
 - .NET 8
 - ASP.NET Core Razor Pages
@@ -38,7 +36,7 @@ WordFormatAnalyzer 是一个本地运行的 ASP.NET Core Razor Pages Web 应用�
 - Bootstrap / jQuery 静态前端资源
 - Windows Word 自动化用于旧版 `.doc` 转换
 
-### 快速开始
+## 快速开始
 
 环境要求：
 
@@ -65,7 +63,7 @@ start-web.bat
 http://localhost:5088
 ```
 
-### 使用流程
+## 使用流程
 
 模板检查流程：
 
@@ -87,7 +85,7 @@ http://localhost:5088
 4. 执行检查。
 5. 查看报告并下载生成结果。
 
-### 目录结构
+## 目录结构
 
 ```text
 .
@@ -118,7 +116,7 @@ http://localhost:5088
 └── start-web.bat
 ```
 
-### 整体架构
+## 整体架构
 
 系统采用单体 Web 应用结构，页面层、业务服务层、模型层和本地存储层在同一个 ASP.NET Core 项目中。各层职责清晰，核心 Word 处理逻辑集中在 `Services/`，页面只负责上传、表单绑定、流程调度和下载。
 
@@ -141,7 +139,7 @@ Application Services (Services/)
 Local Storage (App_Data, Uploads, Generated, SQLite)
 ```
 
-#### 页面层
+### 页面层
 
 `Pages/Index.cshtml` 是主要交互界面，提供模板上传、自定义规则上传、参考模板上传、规则编辑、冲突选择、实际文档上传、报告展示和文件下载入口。
 
@@ -154,7 +152,7 @@ Local Storage (App_Data, Uploads, Generated, SQLite)
 - 将会话保存到 SQLite。
 - 提供带批注 Word、HTML 报告和正常文档下载。
 
-#### 模型层
+### 模型层
 
 `Models/AnalysisModels.cs` 定义系统中的核心数据结构：
 
@@ -169,7 +167,7 @@ Local Storage (App_Data, Uploads, Generated, SQLite)
 - `AnalysisReport`：检测报告。
 - `AnalysisSession`：一次用户分析会话。
 
-#### 服务层
+### 服务层
 
 `Services/` 是业务核心：
 
@@ -191,7 +189,7 @@ Local Storage (App_Data, Uploads, Generated, SQLite)
 - `DatabaseInitializer`：初始化 SQLite 表结构。
 - `AnalysisSessionRepository`：保存和读取分析会话。
 
-#### 存储层
+### 存储层
 
 存储路径由 `appsettings.json` 中的 `Storage` 节配置：
 
@@ -214,7 +212,7 @@ Local Storage (App_Data, Uploads, Generated, SQLite)
 
 这些运行时文件不应提交到 Git。
 
-### 处理流程
+## 处理流程
 
 模板检查的核心流程：
 
@@ -248,7 +246,7 @@ Upload target document
   -> Generate annotated Word, HTML report, and normal document
 ```
 
-### 检查范围
+## 检查范围
 
 当前代码覆盖的主要检查项包括：
 
@@ -263,7 +261,7 @@ Upload target document
 - 中英文标点和句末标点问题。
 - 无法完全自动判断的项目提醒。
 
-### 输出文件
+## 输出文件
 
 一次检查完成后，页面可下载：
 
@@ -271,7 +269,7 @@ Upload target document
 - `*-格式检测报告.html` 或 `*-自定义规则检测报告.html`：离线 HTML 报告。
 - `*-正常文档.docx` 或 `*-按自定义规则调整.docx`：按规则自动调整后的 Word 文档。
 
-### 配置说明
+## 配置说明
 
 默认配置在 `appsettings.json`：
 
@@ -281,7 +279,7 @@ Upload target document
 
 如需本地覆盖配置，可创建未提交的 `appsettings.Local.json` 或使用环境变量。
 
-### 开发与验证
+## 开发与验证
 
 常用命令：
 
@@ -300,174 +298,10 @@ dotnet run --urls "http://localhost:5088"
 - 实际文档上传后生成报告。
 - 带批注 Word、HTML 报告、正常文档下载可用。
 
-### 注意事项
+## 注意事项
 
 - `.doc` 转换依赖 Windows 和 Microsoft Word；非 Windows 环境请使用 `.docx`。
 - 当前应用定位为本地或内网工具，没有内置用户账户和权限系统。
 - 上传文件和生成文件保存在本地运行目录下，不适合直接作为公开互联网服务部署。
 - Open XML 无法完整模拟 Word 的分页排版结果，因此目录页码、复杂浮动对象、图片分页等场景可能需要人工复核。
-
-## English
-
-### Purpose
-
-WordFormatAnalyzer helps users review Word document formatting against a template. It is designed for documents such as theses, reports, contracts, proposals, and bidding files where formatting consistency matters.
-
-Users can upload a template first, let the application extract comments and formatting rules, and then upload the target document for comparison. The application produces clear issues with expected values, actual values, and suggested fixes.
-
-The application also supports a custom-rule workflow: upload a document, let the system split it into document modules, enter rules for each module, and run the check against those rules.
-
-### Features
-
-- `.docx` analysis.
-- `.doc` upload with server-side conversion on Windows when Microsoft Word is installed.
-- Template-first review workflow.
-- Custom module-rule workflow.
-- Template comment, paragraph, run, table, and page setup extraction.
-- Chinese font, Western font, font size, alignment, spacing, line spacing, and first-line-indent rules.
-- Optional qualified reference templates with conflict resolution.
-- Editable per-session rule table.
-- Format checks for fonts, paragraph settings, page setup, table structure, blank areas, punctuation, and partially unchecked items.
-- Severity and category filters in the report page.
-- Annotated Word output.
-- Offline HTML report export.
-- Normalized Word output.
-- SQLite-backed session persistence.
-
-### Tech Stack
-
-- .NET 8
-- ASP.NET Core Razor Pages
-- DocumentFormat.OpenXml 3.1.1
-- Microsoft.Data.Sqlite 8.0.11
-- Bootstrap / jQuery static assets
-- Microsoft Word automation for legacy `.doc` conversion
-
-### Quick Start
-
-Prerequisites:
-
-- .NET 8 SDK.
-- Microsoft Word on Windows if legacy `.doc` conversion is needed.
-- `.docx` analysis does not require Microsoft Word.
-
-Run:
-
-```bash
-dotnet restore
-dotnet run --urls "http://localhost:5088"
-```
-
-On Windows, you can also run:
-
-```bat
-start-web.bat
-```
-
-Open:
-
-```text
-http://localhost:5088
-```
-
-### Usage
-
-Template workflow:
-
-1. Open the home page.
-2. Upload a template document in the template workflow.
-3. Review the template analysis summary.
-4. Optionally upload one or more qualified reference templates.
-5. Resolve rule conflicts if they exist.
-6. Review and edit the effective rules for the current session.
-7. Upload the target document.
-8. Review the report.
-9. Download the annotated Word document, HTML report, or normalized Word document.
-
-Custom-rule workflow:
-
-1. Upload the document in the custom-rule workflow.
-2. Let the system classify document modules.
-3. Fill in module rules in the rule table.
-4. Run the check.
-5. Review and download generated outputs.
-
-### Architecture
-
-The application is a single ASP.NET Core web application with clear internal boundaries:
-
-- Razor Pages handle HTTP requests, upload forms, rule editing, report display, and downloads.
-- Models define document snapshots, template rules, conflicts, issues, reports, and sessions.
-- Services implement all Word processing, comparison, rendering, storage, and persistence behavior.
-- Local storage keeps uploads, generated files, and SQLite session data.
-
-```text
-Browser
-  |
-  v
-Razor Pages
-  |
-  v
-Domain/Application Services
-  |
-  +--> Open XML analysis
-  +--> Style resolution and terminology conversion
-  +--> Rule extraction and conflict resolution
-  +--> Target comparison
-  +--> Word comments, HTML reports, normalized documents
-  |
-  v
-Local files + SQLite
-```
-
-### Key Components
-
-- `Pages/Index.cshtml`: main UI for uploads, rule editing, conflict resolution, reports, and downloads.
-- `Pages/Index.cshtml.cs`: page model and request workflow coordinator.
-- `Models/AnalysisModels.cs`: shared data model for analysis, rules, conflicts, issues, reports, and sessions.
-- `Services/WordAnalysisService.cs`: Open XML document analysis.
-- `Services/WordStyleResolver.cs`: effective paragraph and run formatting resolution.
-- `Services/WordTerminologyService.cs`: conversion from raw Open XML values to Word-friendly wording.
-- `Services/TemplateRuleService.cs`: template rule extraction, merging, and user edits.
-- `Services/TemplateRuleConflictService.cs`: reference-template conflict detection and selection.
-- `Services/EffectiveTemplateService.cs`: builds the final template used for a check.
-- `Services/WordComparisonService.cs`: creates issues and report summaries.
-- `Services/PunctuationIssueService.cs`: punctuation-specific checks.
-- `Services/IssueTextService.cs`: user-facing issue and comment wording.
-- `Services/WordAnnotationService.cs`: writes comments into a copied Word document.
-- `Services/ReportRenderService.cs`: renders offline HTML reports.
-- `Services/NormalDocumentService.cs`: creates a normalized Word document where safe.
-- `Services/WordConversionService.cs`: converts `.doc` to `.docx` when supported.
-- `Services/AppStorage.cs`: creates runtime file paths.
-- `Services/DatabaseInitializer.cs`: creates or updates the SQLite schema.
-- `Services/AnalysisSessionRepository.cs`: persists and loads sessions.
-
-### Storage
-
-Runtime storage is configured in `appsettings.json`:
-
-```json
-{
-  "Storage": {
-    "DataDirectory": "App_Data",
-    "UploadDirectory": "Uploads",
-    "GeneratedDirectory": "Generated",
-    "DatabaseFileName": "word-analyzer.db"
-  }
-}
-```
-
-The app creates:
-
-- `App_Data/Uploads/` for uploaded documents.
-- `App_Data/Generated/` for generated Word and HTML files.
-- `App_Data/word-analyzer.db` for SQLite session data.
-
-These runtime files are ignored by Git.
-
-### Limitations
-
-- `.doc` conversion requires Windows and Microsoft Word.
-- The app is intended for local or intranet use; it does not include authentication or multi-tenant security.
-- Open XML does not fully reproduce Word's pagination engine, so page-number and complex layout checks may require manual confirmation.
 
